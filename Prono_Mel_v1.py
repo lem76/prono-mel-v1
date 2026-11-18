@@ -14,6 +14,20 @@ from sklearn.preprocessing import StandardScaler
 warnings.filterwarnings('ignore')
 
 st.set_page_config(page_title="Prono Mel v1 - Calcio AI & Tracker", page_icon="⚽", layout="wide")
+if "autenticato" not in st.session_state:
+    st.session_state["autenticato"] = False
+
+if not st.session_state["autenticato"]:
+    st.title("🔒 Accesso Riservato — Prono Mel v1")
+    pwd_inserita = st.text_input("Inserisci la password personale:", type="password")
+    if st.button("Entra", type="primary"):
+        if pwd_inserita == st.secrets.get("app_password", ""):
+            st.session_state["autenticato"] = True
+            st.rerun()
+        else:
+            st.error("Password errata. Riprova.")
+    st.stop()
+
 
 QUOTA_MIN = 1.35
 QUOTA_MAX = 4.00
