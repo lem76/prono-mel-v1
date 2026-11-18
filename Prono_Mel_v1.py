@@ -97,7 +97,7 @@ def scarica_stagioni(lista_stagioni):
     ]
     for cod in CAMPIONATI.keys():
         for s in lista_stagioni:
-            url = f"https://football-data.co.uk{s}/{cod}.csv"
+            url = f"https://www.football-data.co.uk/mmz4281/{s}/{cod}.csv"
             txt = scarica_csv_veloce(url, tentativi=2)
             if txt is None:
                 falliti.append(f"{cod}_{s}")
@@ -330,7 +330,7 @@ def prepara_motore_predittivo(forza_aggiornamento=False):
 
     return db, elo_ratings, ultima_data, ultima_div, feat_cols, medie_feat, scaler, modelli
 def analizza_palinsesto_futuro(db, elo_ratings, ultima_data, ultima_div, feat_cols, medie_feat, scaler, modelli, soglia_ev, flat_stake, budget_tot, solo_top5=True):
-    txt_fix = scarica_csv_veloce("https://football-data.co.uk", tentativi=2)
+    txt_fix = scarica_csv_veloce("https://www.football-data.co.uk/fixtures.csv", tentativi=2)
     if txt_fix is None:
         return pd.DataFrame(), "Impossibile scaricare fixtures.csv al momento."
     df_fix = rinomina_colonne_csv(pd.read_csv(io.StringIO(txt_fix), on_bad_lines='skip'))
