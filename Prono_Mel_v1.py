@@ -632,7 +632,9 @@ with tab_tracker:
         in_corso = df_tr[df_tr['Esito'] == 'In Corso']
         if not in_corso.empty:
             id_sel = st.selectbox("Seleziona ID giocata da chiudere:", in_corso['ID'].tolist())
-            r_sel = df_tr[df_tr['ID'] == id_sel].iloc.to_dict()
+           
+            r_sel = df_tr[df_tr['ID'] == id_sel].to_dict(orient='records').pop(0)
+
             st.write(f"**{r_sel['Partita']}** — Mercato: **{r_sel['Mercato']}** @ **{r_sel['Quota_Presa']}** (Puntata: {r_sel['Puntata_Euro']} €)")
             c_e1, c_e2, c_e3 = st.columns(3)
             with c_e1:
