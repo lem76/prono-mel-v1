@@ -12,7 +12,7 @@ CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "")
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
     "Accept": "text/csv,text/plain,*/*",
-    "Referer": "https://football-data.co.uk"
+    "Referer": "https://www.football-data.co.uk"
 }
 
 CAMPIONATI_TOP5 = {
@@ -59,13 +59,13 @@ def esegui_controllo():
     for cod in CAMPIONATI_TOP5.keys():
         for s in stagioni:
             try:
-            url_csv = "https://www.football-data.co.uk" + f"/mmz4281/{s}/{cod}.csv"
+                url_csv = "https://www.football-data.co.uk" + f"/mmz4281/{s}/{cod}.csv"
 
-            r = requests.get(url_csv, headers=HEADERS, timeout=15)
-            if r.status_code == 200 and "<html" not in r.text.lower():
-                df = pd.read_csv(io.StringIO(r.text), on_bad_lines='skip', encoding='utf-8-sig', engine='python')
-                if 'Div' not in df.columns:
-                    raise KeyError(f"Colonna 'Div' mancante. Colonne: {list(df.columns)}")          
+                r = requests.get(url_csv, headers=HEADERS, timeout=15)
+                if r.status_code == 200 and "<html" not in r.text.lower():
+                    df = pd.read_csv(io.StringIO(r.text), on_bad_lines='skip', encoding='utf-8-sig', engine='python')
+                    if 'Div' not in df.columns:
+                        raise KeyError(f"Colonna 'Div' mancante. Colonne: {list(df.columns)}")          
                     if all(c in df.columns for c in ['Date', 'HomeTeam', 'AwayTeam', 'FTHG', 'FTAG', 'B365H', 'B365D', 'B365A']):
                         for c in ['HST', 'AST', 'AvgH', 'AvgD', 'AvgA', 'MaxH', 'MaxD', 'MaxA']:
                             if c not in df.columns:
