@@ -117,7 +117,7 @@ def scarica_stagioni(lista_stagioni):
                 falliti.append(f"{cod}_{s}")
                 continue
             try:
-                df = pd.read_csv(io.StringIO(txt), on_bad_lines='skip', encoding='utf-8-sig')
+                df = pd.read_csv(io.StringIO(txt), on_bad_lines='skip', encoding='latin-1')
                 df = rinomina_colonne_csv(df)
                 base = ['Date', 'HomeTeam', 'AwayTeam', 'FTHG', 'FTAG', 'B365H', 'B365D', 'B365A']
                 if not all(c in df.columns for c in base):
@@ -347,7 +347,7 @@ def analizza_palinsesto_futuro(db, elo_ratings, ultima_data, ultima_div, feat_co
     txt_fix = scarica_csv_veloce("https://www.football-data.co.uk/fixtures.csv", tentativi=2)
     if txt_fix is None:
         return pd.DataFrame(), "Impossibile scaricare fixtures.csv al momento."
-    df_fix = rinomina_colonne_csv(pd.read_csv(io.StringIO(txt_fix), on_bad_lines='skip', encoding='utf-8-sig'))
+    df_fix = rinomina_colonne_csv(pd.read_csv(io.StringIO(txt_fix), on_bad_lines='skip', encoding='latin-1'))
     if 'Div' not in df_fix.columns:
         return pd.DataFrame(), "Palinsesto non disponibile."
 
