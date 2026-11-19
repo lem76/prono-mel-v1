@@ -57,7 +57,7 @@ def esegui_controllo():
     anno = oggi.year if oggi.month >= 7 else oggi.year - 1
     stagioni = [f"{str(y)[-2:]}{str(y + 1)[-2:]}" for y in range(2020, anno + 1)]
     fogli = []
-    for cod in CAMPIONATI_TOP5.keys()
+    for cod in CAMPIONATI_TOP5.keys():
         for s in stagioni:
             try:
                 r = requests.get(f"https://www.football-data.co.uk/mmz4281/{s}/{cod}.csv", headers=HEADERS, timeout=10)
