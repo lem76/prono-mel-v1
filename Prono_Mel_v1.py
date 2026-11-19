@@ -645,7 +645,8 @@ with tab_tracker:
                 aggio_chiusura = st.number_input("Aggio stimato chiusura (%)", min_value=0.0, max_value=10.0, value=2.5, step=0.5)
 
             if st.button("💾 Salva Chiusura Giocata"):
-                idx_row = df_tr[df_tr['ID'] == id_sel].index.item(0)
+                
+                idx_row = df_tr[df_tr['ID'] == id_sel].index.tolist().pop(0)
                 stake_v = float(df_tr.loc[idx_row, 'Puntata_Euro'])
                 q_presa = float(df_tr.loc[idx_row, 'Quota_Presa'])
                 prof_v = round(stake_v * (q_presa - 1.0), 2) if nuovo_esito == "Vinta" else (-stake_v if nuovo_esito == "Persa" else 0.0)
