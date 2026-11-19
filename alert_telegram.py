@@ -63,7 +63,7 @@ def esegui_controllo():
 
                 r = requests.get(url_csv, headers=HEADERS, timeout=15)
                 if r.status_code == 200 and "<html" not in r.text.lower():
-                    df = pd.read_csv(io.StringIO(r.text), on_bad_lines='skip', encoding='utf-8-sig')
+                    df = pd.read_csv(io.StringIO(r.text), on_bad_lines='skip', encoding='latin-1')
                     if all(c in df.columns for c in ['Date', 'HomeTeam', 'AwayTeam', 'FTHG', 'FTAG', 'B365H', 'B365D', 'B365A']):
                         for c in ['HST', 'AST', 'AvgH', 'AvgD', 'AvgA', 'MaxH', 'MaxD', 'MaxA']:
                             if c not in df.columns:
@@ -113,7 +113,7 @@ def esegui_controllo():
 
     url_fix = "https://www.football-data.co.uk/fixtures.csv"
     r_fix = requests.get(url_fix, headers=HEADERS, timeout=15)
-    df_fix = pd.read_csv(io.StringIO(r_fix.text), on_bad_lines='skip', encoding='utf-8-sig')
+    df_fix = pd.read_csv(io.StringIO(r_fix.text), on_bad_lines='skip', encoding='latin-1')
     df_fix = df_fix[df_fix['Div'].isin(list(CAMPIONATI_TOP5.keys()))].dropna(subset=['Date', 'HomeTeam', 'AwayTeam', 'B365H', 'B365D', 'B365A'])
     df_fix['Data_DT'] = pd.to_datetime(df_fix['Date'], dayfirst=True, format='mixed', errors='coerce')
     df_fix = df_fix[df_fix['Data_DT'] >= pd.Timestamp.now().normalize()]
