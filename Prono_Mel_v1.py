@@ -474,6 +474,90 @@ def analizza_palinsesto_futuro(db, elo_ratings, ultima_data, ultima_div, feat_co
             df_seg.loc[grp.index, 'Puntata_Consigliata'] = (df_seg.loc[grp.index, 'Puntata_Consigliata'] * (cap_euro / tot_d)).round(2)
 
     return df_seg, "OK"
+def invia_alert_telegram(df_seg):
+    token = st.secrets.get("telegram_token", "")
+    chat_id = str(st.secrets.get("telegram_chat_id", ""))
+    if not token or not chat_id:
+        return False, "Configura telegram_token e telegram_chat_id nei Secrets di Streamlit."
+    righe = ["⚽ *PRONO MEL v1 — SEGNALI RILEVATI* ⚽\n"]
+    for _, r in df_seg.iterrows():
+        righe.append(
+            f"📅 {r['Data']} | *{r['Campionato']}*\n"
+            f"🏟️ {r['Partita']} -> Mercato: *{r['Mercato']}*\n"
+            f"💰 Quota Max: *{r['Quota_MAX']}* | EV: *+{r['EV_Pct']}%* | Puntata: *{r['Puntata_Consigliata']} €*\n"
+        )
+    testo = "\n".join(righe)
+    try:
+        resp = requests.post(
+            f"https://telegram.org{token}/sendMessage",
+            json={"chat_id": chat_id, "text": testo, "parse_mode": "Markdown"},
+            timeout=10
+        )
+        if resp.status_code == 200:
+            return True, "Alert inviato con successo su Telegram!"
+        return False, f"Errore Telegram ({resp.status_code}): avvia prima la chat con il tuo bot."
+    except Exception as e:
+        return False, f"Errore invio Telegram: {e}"
+
+def chiudi_partite_automatico(df_tr, db_storico):
+    in_corso = df_tr[df_tr['Esito'] == 'In Corso']
+    if in_corso.empty:
+        return df_tr, 0
+    chiuse_count = 0
+    for idx in in_corso.index:
+        partita_str = str(df_tr.loc[idx, 'Partita'])
+        if " - " not in partita_str:
+            continue
+        casa, trasf = partita_str.split(" - ", 1)
+        data_dt = pd.to_datetime(df_tr.loc[idx, 'Data_Match'], dayfirst=True, format='mixed', errors='coerce')
+        if pd.isna(data_dt):
+            continue
+        match_db = db_storico[
+            (db_storico['HomeTeam'] == casa) &
+            (db_storico['AwayTeam'] == trasf) &
+            ((db_storico['Data_DT'] - data_dt).abs().dt.days <= 3)
+        ]
+        if match_db.empty:
+            continue
+        rec = match_db.tail(1).to_dict(orient='records').pop(0)
+        hg, ag = float(rec['FTHG']), float(rec['FTAG'])
+        mkt = str(df_tr.loc[idx, 'Mercato'])
+        stake_v = float(df_tr.loc[idx, 'Puntata_Euro'])
+        q_presa = float(df_tr.loc[idx, 'Quota_Presa'])
+
+        vinta = False
+        q_close = np.nan
+        if mkt == '1':
+            vinta = hg > ag
+            q_close = rec.get('AvgCH', np.nan)
+        elif mkt == 'X':
+            vinta = hg == ag
+            q_close = rec.get('AvgCD', np.nan)
+        elif mkt == '2':
+            vinta = hg < ag
+            q_close = rec.get('AvgCA', np.nan)
+        elif mkt == 'OVER 2.5':
+            vinta = (hg + ag) > 2.5
+            q_close = rec.get('AvgC_Over25', np.nan)
+        elif mkt == 'UNDER 2.5':
+            vinta = (hg + ag) < 2.5
+            q_close = rec.get('AvgC_Under25', np.nan)
+
+        esito_fin = "Vinta" if vinta else "Persa"
+        prof_v = round(stake_v * (q_presa - 1.0), 2) if vinta else -stake_v
+        clv_net = np.nan
+        if pd.notna(q_close) and float(q_close) > 1.0:
+            p_close_clean = (1.0 / float(q_close)) / 1.025
+            clv_net = round(((q_presa * p_close_clean) - 1.0) * 100.0, 2)
+
+        df_tr.loc[idx, 'Esito'] = esito_fin
+        df_tr.loc[idx, 'Quota_Chiusura'] = round(float(q_close), 2) if pd.notna(q_close) else np.nan
+        df_tr.loc[idx, 'Profitto_Euro'] = prof_v
+        df_tr.loc[idx, 'CLV_Netto_Pct'] = clv_net
+        chiuse_count += 1
+
+    return df_tr, chiuse_count
+
 st.title("⚽ Prono Mel v1 — Motore Quantitativo & Profit Tracker")
 st.caption("Cloud Edition: Power Devig + Logit-Offset + Outcome Bias + Sincronizzazione Google Sheets")
 
@@ -529,6 +613,13 @@ with tab_prono:
                 df_seg[['Data', 'Campionato', 'Partita', 'Mercato', 'Quota_B365', 'Quota_Media', 'Quota_MAX', 'Prob_AI_Pct', 'EV_Pct', 'Puntata_Consigliata']],
                 use_container_width=True
             )
+            if st.button("📲 Invia Pronostici su Telegram"):
+                ok_tg, msg_tg = invia_alert_telegram(df_seg)
+                if ok_tg:
+                    st.success(msg_tg)
+                else:
+                    st.warning(msg_tg)
+
 
             st.divider()
             st.subheader("🔍 Verifica Quota Live, Malus Assenze (T-45 min) e Registrazione")
@@ -631,6 +722,17 @@ with tab_tracker:
 
         st.divider()
         st.markdown("### ✏️ Aggiorna Esiti e Quota di Chiusura")
+        if st.button("🔄 Chiudi Partite Concluse in Automatico (da Football-Data)", type="primary"):
+            st.cache_resource.clear()
+            db_agg = list(prepara_motore_predittivo()).pop(0)
+            df_tr_agg, n_agg = chiudi_partite_automatico(df_tr.copy(), db_agg)
+            if n_agg > 0:
+                salva_tracker(df_tr_agg)
+                st.success(f"Aggiornate automaticamente {n_agg} partite con esito e Quota di Chiusura Reale!")
+                st.rerun()
+            else:
+                st.info("Nessuna nuova partita conclusa trovata ancora nei CSV aggiornati.")
+
         in_corso = df_tr[df_tr['Esito'] == 'In Corso']
         if not in_corso.empty:
             id_sel = st.selectbox("Seleziona ID giocata da chiudere:", in_corso['ID'].tolist())
