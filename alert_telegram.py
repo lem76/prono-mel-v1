@@ -23,7 +23,7 @@ CAMPIONATI_TOP5 = {
 def invia_tg(testo):
     if TOKEN and CHAT_ID:
         requests.post(
-            f"https://telegram.org{TOKEN}/sendMessage",
+            f"https://api.telegram.org/bot{TOKEN}/sendMessage",
             json={"chat_id": CHAT_ID, "text": testo, "parse_mode": "Markdown"},
             timeout=15
         )
