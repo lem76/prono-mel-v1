@@ -493,7 +493,9 @@ with st.sidebar:
 
     st.divider()
     st.subheader("🔑 Line Shopping Live (Opzionale)")
-    odds_api_key = st.text_input("API Key The Odds API (500 req/mese gratis)", type="password")
+    
+    odds_api_key = st.text_input("API Key The Odds API (500 req/mese gratis)", value=st.secrets.get("odds_api_key", ""), type="password")
+
 
     if st.button("🔄 Aggiorna Archivio Storico"):
         st.cache_resource.clear()
