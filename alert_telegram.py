@@ -125,7 +125,12 @@ def esegui_controllo():
             'A_EWM_SOT': pt['A_SOT_Diff'].ewm(span=10, min_periods=1).mean().iloc.item(-1) if len(pt) > 0 else medie['A_EWM_SOT']
         }]).fillna(medie)
         x_s = scaler.transform(rx)
-        p_raw = {m: float(expit(logit(np.clip(p_open.item(i), eps, 1 - eps)) + mod[m][0] + (x_s @ mod[m][1]).item(0))) for i, m in enumerate(['1', 'X', '2'])}
+        p_raw = {}
+        for i, m in enumerate(['1', 'X', '2']):
+            b0_m, b_m = mod[m]
+            off_m = float(logit(np.clip(p_open.item(i), eps, 1 - eps)))
+            p_raw[m] = float(expit(off_m + b0_m + (x_s @ b_m).item(0)))
+
         tot_p = sum(p_raw.values())
         for m in ['1', 'X', '2']:
             p_f = p_raw[m] / tot_p
