@@ -59,19 +59,22 @@ def esegui_controllo():
     for cod in CAMPIONATI_TOP5.keys():
         for s in stagioni:
             try:
-                url_csv = "https://www.football-data.co.uk" + f"/mmz4281/{s}/{cod}.csv"
+            url_csv = "https://www.football-data.co.uk" + f"/mmz4281/{s}/{cod}.csv"
 
-                r = requests.get(url_csv, headers=HEADERS, timeout=15)
-                if r.status_code == 200 and "<html" not in r.text.lower():
-                    df = pd.read_csv(io.StringIO(r.text), on_bad_lines='skip', encoding='latin-1')
+            r = requests.get(url_csv, headers=HEADERS, timeout=15)
+            if r.status_code == 200 and "<html" not in r.text.lower():
+                df = pd.read_csv(io.StringIO(r.text), on_bad_lines='skip', encoding='utf-8-sig', engine='python')
+                if 'Div' not in df.columns:
+                    raise KeyError(f"Colonna 'Div' mancante. Colonne: {list(df.columns)}")          
                     if all(c in df.columns for c in ['Date', 'HomeTeam', 'AwayTeam', 'FTHG', 'FTAG', 'B365H', 'B365D', 'B365A']):
                         for c in ['HST', 'AST', 'AvgH', 'AvgD', 'AvgA', 'MaxH', 'MaxD', 'MaxA']:
                             if c not in df.columns:
                                 df[c] = np.nan
                         df['Div'] = cod
                         fogli.append(df[['Div', 'Date', 'HomeTeam', 'AwayTeam', 'FTHG', 'FTAG', 'HST', 'AST', 'B365H', 'B365D', 'B365A', 'AvgH', 'AvgD', 'AvgA', 'MaxH', 'MaxD', 'MaxA']])
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"Errore nel file {cod} stagione {s}: {e}")            
+            
 
     if not fogli:
         invia_tg("⚠️ *PRONO MEL v1*: Impossibile scaricare i CSV da football-data in questo momento.")
@@ -113,11 +116,21 @@ def esegui_controllo():
 
     url_fix = "https://www.football-data.co.uk/fixtures.csv"
     r_fix = requests.get(url_fix, headers=HEADERS, timeout=15)
-    df_fix = pd.read_csv(io.StringIO(r_fix.text), on_bad_lines='skip', encoding='latin-1')
-    df_fix = df_fix[df_fix['Div'].isin(list(CAMPIONATI_TOP5.keys()))].dropna(subset=['Date', 'HomeTeam', 'AwayTeam', 'B365H', 'B365D', 'B365A'])
-    df_fix['Data_DT'] = pd.to_datetime(df_fix['Date'], dayfirst=True, format='mixed', errors='coerce')
-    df_fix = df_fix[df_fix['Data_DT'] >= pd.Timestamp.now().normalize()]
-
+    
+    try:
+        df_fix = pd.read_csv(io.StringIO(r_fix.text), on_bad_lines='skip', encoding='utf-8-sig', engine='python')
+        
+        if 'Div' not in df_fix.columns:
+            raise KeyError(f"Colonna 'Div' non trovata. Colonne disponibili: {list(df_fix.columns)}")
+            
+        df_fix = df_fix[df_fix['Div'].isin(list(CAMPIONATI_TOP5.keys()))].dropna(subset=['Date', 'HomeTeam', 'AwayTeam', 'B365H', 'B365D', 'B365A'])
+        df_fix['Data_DT'] = pd.to_datetime(df_fix['Date'], dayfirst=True, format='mixed', errors='coerce')
+        df_fix = df_fix[df_fix['Data_DT'] >= pd.Timestamp.now().normalize()]
+        
+    except Exception as e:
+        invia_tg(f"⚠️ *ERRORE CRITICO NEL FIXTURES*: {e}")
+        return
+   
     trovate = []
     for _, row in df_fix.iterrows():
         ht, at = row['HomeTeam'], row['AwayTeam']
