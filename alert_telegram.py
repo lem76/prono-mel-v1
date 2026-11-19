@@ -64,6 +64,7 @@ def esegui_controllo():
                 r = requests.get(url_csv, headers=HEADERS, timeout=15)
                 if r.status_code == 200 and "<html" not in r.text.lower():
                     df = pd.read_csv(io.StringIO(r.text), on_bad_lines='skip', encoding='utf-8-sig', engine='python')
+                    df.columns = df.columns.str.replace('ï»¿', '')
                     if 'Div' not in df.columns:
                         raise KeyError(f"Colonna 'Div' mancante. Colonne: {list(df.columns)}")          
                     if all(c in df.columns for c in ['Date', 'HomeTeam', 'AwayTeam', 'FTHG', 'FTAG', 'B365H', 'B365D', 'B365A']):
@@ -119,7 +120,7 @@ def esegui_controllo():
     
     try:
         df_fix = pd.read_csv(io.StringIO(r_fix.text), on_bad_lines='skip', encoding='utf-8-sig', engine='python')
-        
+        df_fix.columns = df_fix.columns.str.replace('ï»¿', '')
         if 'Div' not in df_fix.columns:
             raise KeyError(f"Colonna 'Div' non trovata. Colonne disponibili: {list(df_fix.columns)}")
             
