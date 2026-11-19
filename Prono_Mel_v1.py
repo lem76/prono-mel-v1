@@ -489,7 +489,7 @@ def invia_alert_telegram(df_seg):
     testo = "\n".join(righe)
     try:
         resp = requests.post(
-            f"https://telegram.org{token}/sendMessage",
+            f"https://api.telegram.org/bot{token}/sendMessage",
             json={"chat_id": chat_id, "text": testo, "parse_mode": "Markdown"},
             timeout=10
         )
