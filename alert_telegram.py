@@ -15,7 +15,6 @@ HEADERS = {
     "Referer": "https://football-data.co.uk"
 }
 
-
 CAMPIONATI_TOP5 = {
     'I1': 'Serie A', 'E0': 'Premier League', 'SP1': 'La Liga',
     'D1': 'Bundesliga', 'F1': 'Ligue 1'
@@ -44,7 +43,7 @@ def devig_power_col(df, cols):
 
 def esegui_controllo():
     oggi = pd.Timestamp.now(tz="Europe/Rome")
-    giorno = oggi.weekday()  # 0=Lun, 3=Gio, 4=Ven, 5=Sab, 6=Dom
+    giorno = oggi.weekday()
 
     if giorno == 0:
         invia_tg("📅 *LUNEDÌ — PRONO MEL v1*\nRicordati di aprire l'app e premere *🔄 Chiudi Partite Concluse in Automatico* nella Scheda 2 per aggiornare CLV e Semaforo!")
@@ -60,7 +59,8 @@ def esegui_controllo():
     for cod in CAMPIONATI_TOP5.keys():
         for s in stagioni:
             try:
-                r = requests.get(f"https://www.football-data.co.uk/mmz4281/{s}/{cod}.csv", headers=HEADERS, timeout=10)
+                url_csv = f"https://football-data.co.ukmmz4281/{s}/{cod}.csv"
+                r = requests.get(url_csv, headers=HEADERS, timeout=15)
                 if r.status_code == 200 and "<html" not in r.text.lower():
                     df = pd.read_csv(io.StringIO(r.text), on_bad_lines='skip')
                     if all(c in df.columns for c in ['Date', 'HomeTeam', 'AwayTeam', 'FTHG', 'FTAG', 'B365H', 'B365D', 'B365A']):
@@ -70,15 +70,11 @@ def esegui_controllo():
                         df['Div'] = cod
                         fogli.append(df[['Div', 'Date', 'HomeTeam', 'AwayTeam', 'FTHG', 'FTAG', 'HST', 'AST', 'B365H', 'B365D', 'B365A', 'AvgH', 'AvgD', 'AvgA', 'MaxH', 'MaxD', 'MaxA']])
             except Exception:
-                except Exception:
                 pass
 
     if not fogli:
         invia_tg("⚠️ *PRONO MEL v1*: Impossibile scaricare i CSV da football-data in questo momento.")
         return
-
-    db = pd.concat(fogli, ignore_index=True).dropna(subset=['Date', 'HomeTeam', 'AwayTeam', 'FTHG', 'FTAG', 'B365H', 'B365D', 'B365A'])
-            pass
 
     db = pd.concat(fogli, ignore_index=True).dropna(subset=['Date', 'HomeTeam', 'AwayTeam', 'FTHG', 'FTAG', 'B365H', 'B365D', 'B365A'])
     db['Data_DT'] = pd.to_datetime(db['Date'], dayfirst=True, format='mixed', errors='coerce')
@@ -114,7 +110,8 @@ def esegui_controllo():
         res = minimize(lg, np.zeros(len(feat) + 1), jac=True, method='BFGS')
         mod[m] = (float(res.x.item(0)), res.x[1:])
 
-    r_fix = requests.get("www.https://football-data.co.uk/fixtures.csv", headers=HEADERS, timeout=15) 
+    url_fix = "https://football-data.co.uk" + "/fixtures.csv"
+    r_fix = requests.get(url_fix, headers=HEADERS, timeout=15)
     df_fix = pd.read_csv(io.StringIO(r_fix.text), on_bad_lines='skip')
     df_fix = df_fix[df_fix['Div'].isin(list(CAMPIONATI_TOP5.keys()))].dropna(subset=['Date', 'HomeTeam', 'AwayTeam', 'B365H', 'B365D', 'B365A'])
     df_fix['Data_DT'] = pd.to_datetime(df_fix['Date'], dayfirst=True, format='mixed', errors='coerce')
@@ -132,10 +129,10 @@ def esegui_controllo():
         p_open = devig_power_col(pd.DataFrame([avg_q], columns=['a', 'b', 'c']), ['a', 'b', 'c']).flatten()
         pc, pt = db[db['HomeTeam'] == ht], db[db['AwayTeam'] == at]
         rx = pd.DataFrame([{
-            'H_EWM_ResPts': pc['H_Res_Pts'].ewm(span=10, min_periods=1).mean().iloc.item(-1) if len(pc) > 0 else medie['H_EWM_ResPts'],
-            'A_EWM_ResPts': pt['A_Res_Pts'].ewm(span=10, min_periods=1).mean().iloc.item(-1) if len(pt) > 0 else medie['A_EWM_ResPts'],
-            'H_EWM_SOT': pc['H_SOT_Diff'].ewm(span=10, min_periods=1).mean().iloc.item(-1) if len(pc) > 0 else medie['H_EWM_SOT'],
-            'A_EWM_SOT': pt['A_SOT_Diff'].ewm(span=10, min_periods=1).mean().iloc.item(-1) if len(pt) > 0 else medie['A_EWM_SOT']
+            'H_EWM_ResPts': pc['H_Res_Pts'].ewm(span=10, min_periods=1).mean().tolist().pop(-1) if len(pc) > 0 else medie['H_EWM_ResPts'],
+            'A_EWM_ResPts': pt['A_Res_Pts'].ewm(span=10, min_periods=1).mean().tolist().pop(-1) if len(pt) > 0 else medie['A_EWM_ResPts'],
+            'H_EWM_SOT': pc['H_SOT_Diff'].ewm(span=10, min_periods=1).mean().tolist().pop(-1) if len(pc) > 0 else medie['H_EWM_SOT'],
+            'A_EWM_SOT': pt['A_SOT_Diff'].ewm(span=10, min_periods=1).mean().tolist().pop(-1) if len(pt) > 0 else medie['A_EWM_SOT']
         }]).fillna(medie)
         x_s = scaler.transform(rx)
         p_raw = {}
@@ -143,7 +140,6 @@ def esegui_controllo():
             b0_m, b_m = mod[m]
             off_m = float(logit(np.clip(p_open.item(i), eps, 1 - eps)))
             p_raw[m] = float(expit(off_m + b0_m + (x_s @ b_m).item(0)))
-
         tot_p = sum(p_raw.values())
         for m in ['1', 'X', '2']:
             p_f = p_raw[m] / tot_p
