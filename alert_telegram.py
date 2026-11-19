@@ -9,7 +9,12 @@ from sklearn.preprocessing import StandardScaler
 
 TOKEN = os.environ.get("TELEGRAM_TOKEN", "")
 CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "")
-HEADERS = {"User-Agent": "Mozilla/5.0"}
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "Accept": "text/csv,text/plain,*/*",
+    "Referer": "https://football-data.co.uk"
+}
+
 
 CAMPIONATI_TOP5 = {
     'I1': 'Serie A', 'E0': 'Premier League', 'SP1': 'La Liga',
@@ -52,10 +57,10 @@ def esegui_controllo():
     anno = oggi.year if oggi.month >= 7 else oggi.year - 1
     stagioni = [f"{str(y)[-2:]}{str(y + 1)[-2:]}" for y in range(2020, anno + 1)]
     fogli = []
-    for cod in CAMPIONATI_TOP5.keys():
+    for cod in CAMPIONATI_TOP5.keys()
         for s in stagioni:
             try:
-                r = requests.get(f"https://football-data.co.uk{s}/{cod}.csv", headers=HEADERS, timeout=10)
+                r = requests.get(f"https://www.football-data.co.uk/mmz4281/{s}/{cod}.csv", headers=HEADERS, timeout=10)
                 if r.status_code == 200 and "<html" not in r.text.lower():
                     df = pd.read_csv(io.StringIO(r.text), on_bad_lines='skip')
                     if all(c in df.columns for c in ['Date', 'HomeTeam', 'AwayTeam', 'FTHG', 'FTAG', 'B365H', 'B365D', 'B365A']):
@@ -65,7 +70,15 @@ def esegui_controllo():
                         df['Div'] = cod
                         fogli.append(df[['Div', 'Date', 'HomeTeam', 'AwayTeam', 'FTHG', 'FTAG', 'HST', 'AST', 'B365H', 'B365D', 'B365A', 'AvgH', 'AvgD', 'AvgA', 'MaxH', 'MaxD', 'MaxA']])
             except Exception:
+                except Exception:
                 pass
+
+    if not fogli:
+        invia_tg("⚠️ *PRONO MEL v1*: Impossibile scaricare i CSV da football-data in questo momento.")
+        return
+
+    db = pd.concat(fogli, ignore_index=True).dropna(subset=['Date', 'HomeTeam', 'AwayTeam', 'FTHG', 'FTAG', 'B365H', 'B365D', 'B365A'])
+            pass
 
     db = pd.concat(fogli, ignore_index=True).dropna(subset=['Date', 'HomeTeam', 'AwayTeam', 'FTHG', 'FTAG', 'B365H', 'B365D', 'B365A'])
     db['Data_DT'] = pd.to_datetime(db['Date'], dayfirst=True, format='mixed', errors='coerce')
@@ -101,7 +114,7 @@ def esegui_controllo():
         res = minimize(lg, np.zeros(len(feat) + 1), jac=True, method='BFGS')
         mod[m] = (float(res.x.item(0)), res.x[1:])
 
-    r_fix = requests.get("https://football-data.co.uk", headers=HEADERS, timeout=15)
+    r_fix = requests.get("www.https://football-data.co.uk/fixtures.csv", headers=HEADERS, timeout=15) 
     df_fix = pd.read_csv(io.StringIO(r_fix.text), on_bad_lines='skip')
     df_fix = df_fix[df_fix['Div'].isin(list(CAMPIONATI_TOP5.keys()))].dropna(subset=['Date', 'HomeTeam', 'AwayTeam', 'B365H', 'B365D', 'B365A'])
     df_fix['Data_DT'] = pd.to_datetime(df_fix['Date'], dayfirst=True, format='mixed', errors='coerce')
