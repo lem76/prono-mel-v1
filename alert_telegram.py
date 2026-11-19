@@ -59,7 +59,8 @@ def esegui_controllo():
     for cod in CAMPIONATI_TOP5.keys():
         for s in stagioni:
             try:
-                url_csv = f"https://football-data.co.ukmmz4281/{s}/{cod}.csv"
+                url_csv = "https://www.football-data.co.uk" + f"/mmz4281/{s}/{cod}.csv"
+
                 r = requests.get(url_csv, headers=HEADERS, timeout=15)
                 if r.status_code == 200 and "<html" not in r.text.lower():
                     df = pd.read_csv(io.StringIO(r.text), on_bad_lines='skip')
@@ -110,7 +111,7 @@ def esegui_controllo():
         res = minimize(lg, np.zeros(len(feat) + 1), jac=True, method='BFGS')
         mod[m] = (float(res.x.item(0)), res.x[1:])
 
-    url_fix = "https://football-data.co.uk" + "/fixtures.csv"
+    url_fix = "https://www.football-data.co.uk/fixtures.csv"
     r_fix = requests.get(url_fix, headers=HEADERS, timeout=15)
     df_fix = pd.read_csv(io.StringIO(r_fix.text), on_bad_lines='skip')
     df_fix = df_fix[df_fix['Div'].isin(list(CAMPIONATI_TOP5.keys()))].dropna(subset=['Date', 'HomeTeam', 'AwayTeam', 'B365H', 'B365D', 'B365A'])
