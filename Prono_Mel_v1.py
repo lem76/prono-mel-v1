@@ -4,7 +4,7 @@ import time
 import warnings
 import requests
 import numpy as np
-import pandas as pd
+import pandas as pddf_fix['Data_DT']
 import streamlit as st
 from streamlit_gsheets import GSheetsConnection
 from scipy.optimize import brentq, minimize
@@ -361,6 +361,12 @@ def analizza_palinsesto_futuro(db, elo_ratings, ultima_data, ultima_div, feat_co
 
     df_fix = df_fix[df_fix['Div'].isin(list(CAMPIONATI.keys()))].dropna(subset=['Date', 'HomeTeam', 'AwayTeam', 'B365H', 'B365D', 'B365A']).copy()
     df_fix['Data_DT'] = pd.to_datetime(df_fix['Date'], dayfirst=True, format='mixed', errors='coerce')
+    if 'Time' in df_fix.columns:
+        dt_uk = pd.to_datetime(df_fix['Date'].astype(str) + ' ' + df_fix['Time'].fillna('15:00').astype(str), dayfirst=True, format='mixed', errors='coerce')
+        df_fix['Ora_ITA'] = dt_uk.dt.tz_localize('Europe/London', ambiguous='NaT', nonexistent='NaT').dt.tz_convert('Europe/Rome').dt.strftime('%H:%M').fillna(df_fix['Time'].fillna('N/D'))
+    else:
+        df_fix['Ora_ITA'] = 'N/D'
+
     oggi = pd.Timestamp.now().normalize()
     df_fix = df_fix[df_fix['Data_DT'] >= oggi].copy()
 
@@ -462,7 +468,7 @@ def analizza_palinsesto_futuro(db, elo_ratings, ultima_data, ultima_div, feat_co
                 ev = (p_ai * q_rif) - 1.0
                 if ev >= soglia_ev:
                     segnali.append({
-                        'Data': data_str, 'Campionato': nome_lega, 'Tier': tier_lega,
+                        'Data': data_str, 'Ora_ITA': str(row.get('Ora_ITA', 'N/D')), 'Campionato': nome_lega, 'Tier': tier_lega,
                         'Sport_Key': sport_key, 'Casa': casa, 'Trasferta': trasf,
                         'Partita': f"{casa} - {trasf}", 'Mercato': m_nome,
                         'Quota_B365': qb, 'Quota_Media': round(qavg, 2), 'Quota_MAX': qmax,
@@ -617,9 +623,10 @@ with tab_prono:
         if df_seg.empty:
             st.warning(st.session_state.get('msg_segnali', 'Nessun segnale trovato.'))
         else:
-            st.dataframe(
-                df_seg[['Data', 'Campionato', 'Partita', 'Mercato', 'Quota_B365', 'Quota_Media', 'Quota_MAX', 'Prob_AI_Pct', 'EV_Pct', 'Puntata_Consigliata']],
-                use_container_width=True
+        
+            cols_mostra = [c for c in ['Data', 'Ora_ITA', 'Campionato', 'Partita', 'Mercato', 'Quota_B365', 'Quota_Media', 'Quota_MAX', 'Prob_AI_Pct', 'EV_Pct', 'Puntata_Consigliata'] if c in df_seg.columns]
+            st.dataframe(df_seg[cols_mostra], use_container_width=True)
+
             )
             if st.button("📲 Invia Pronostici su Telegram"):
                 ok_tg, msg_tg = invia_alert_telegram(df_seg)
@@ -636,14 +643,22 @@ with tab_prono:
             riga = df_seg.iloc[scelta_idx]
 
             col_a, col_b = st.columns(2)
+
             with col_a:
                 st.markdown("**A. Comparatore Quote Live (The Odds API)**")
+                if "cache_odds_live" not in st.session_state:
+                    st.session_state["cache_odds_live"] = {}
+                chiave_match = f"{riga['Partita']}_{riga['Mercato']}"
                 if st.button("🔎 Cerca Quota Migliore tra i Bookmaker"):
                     df_live, esito_api = cerca_migliore_quota_live(odds_api_key, riga['Sport_Key'], riga['Casa'], riga['Trasferta'], riga['Mercato'])
-                    if df_live is not None:
-                        st.dataframe(df_live, use_container_width=True)
+                    st.session_state["cache_odds_live"][chiave_match] = (df_live, esito_api)
+                if chiave_match in st.session_state["cache_odds_live"]:
+                    df_live_saved, esito_saved = st.session_state["cache_odds_live"][chiave_match]
+                    if df_live_saved is not None:
+                        st.dataframe(df_live_saved, use_container_width=True)
                     else:
-                        st.info(esito_api)
+                        st.info(esito_saved)
+
 
             with col_b:
                 st.markdown("**B. Check Assenze & Calcolo EV Finale**")
@@ -777,10 +792,22 @@ with tab_tracker:
         st.dataframe(df_view.sort_values(by='ID', ascending=False), use_container_width=True)
 
 with tab_guida:
-    st.subheader("📘 Routine Settimanale & Regole di Gestione Rischio")
+    st.subheader("📘 Manuale Operativo Completo — Prono Mel v1 (Cloud & Telegram)")
     st.markdown("""
-    * **Lunedì Mattina (09:00 - 12:00):** Aggiorna esiti e quote di chiusura nel Profit Tracker e riconcilia il saldo.
-    * **Giovedì Pomeriggio (18:00) / Venerdì (10:00 - 19:00):** Lancia l'analisi del weekend, usa il comparatore per il *Line Shopping* e registra le giocate candidate.
-    * **Sabato / Domenica (T-45 minuti):** Controlla le formazioni ufficiali e gli infortuni. Usa il cursore *Malus Assenze* solo per gestire o scartare le giocate già individuate se mancano titolari chiave.
-    * **Regola d'Oro:** Non superare mai il tetto giornaliero del **2%** e attendi almeno **300 giocate** con **CLV Netto positivo** prima di passare dal Paper Trading al Pilota Reale Micro (0.5%).
+    ### 1. Calendario Settimanale & Automazioni Telegram
+    * **Giovedì (18:30) e Venerdì (11:00) — Estrazione Segnali:** Il bot GitHub Actions analizza i Top 5 campionati europei e ti invia su **Telegram** le partite con `EV >= +3.0%` (oppure puoi premere manualmente **🚀 Analizza Partite Future** e **📲 Invia Pronostici su Telegram** nella Scheda 1).
+    * **Line Shopping (Giovedì / Venerdì):** Seleziona ciascuna partita nella Scheda 1 e usa **🔎 Cerca Quota Migliore tra i Bookmaker** (i risultati restano salvati in memoria senza consumare nuovi crediti API quando cambi scheda).
+    * **Sabato e Domenica (45 minuti prima dell'Ora ITA):** Controlla le formazioni ufficiali su *Diretta.it*.
+      * **Squadra al completo:** Lascia il cursore **Malus Assenze** a **`0.00`** e clicca **✅ Registra nel Tracker** (`Modello Base Congelato`).
+      * **Assenze chiave dell'ultimo minuto:** Sposta il cursore verso sinistra (`-2%` per 1 titolare assente, `-4% / -6%` se mancano portiere, bomber o 3+ titolari). Se l'EV resta verde (`>= 3.0%`) registra la giocata (`Intervento Manuale`); se diventa rosso, scartala con **🗑️ Scarta e Archivia Decisione**.
+    * **Lunedì Mattina (10:00) — Chiusura Automatica:** Apri la **Scheda 2** e premi **🔄 Chiudi Partite Concluse in Automatico**. Il software scaricherà i risultati ufficiali e le quote di chiusura (`AvgCH/CD/CA`), calcolando profitto e **CLV Netto (%)** direttamente sul tuo Foglio Google `Prono_Mel_DB`.
+
+    ### 2. Glossario delle Metriche & Regole del Semaforo
+    * **Probabilità Finale (%):** Probabilità stimata dal modello (quote depurate da Power Devig + Outcome Bias + Elo).
+    * **EV Reale (%):** Vantaggio matematico atteso (`Probabilità * Quota - 1`). Non giocare mai sotto la soglia minima (`3.0%`).
+    * **Cap Giornaliero (2% = 20 €):** L'app ridimensiona in automatico le puntate se nello stesso giorno ci sono più partite valide.
+    * **🟡 Semaforo Giallo:** Fase attuale di *Paper Trading* fino a **300 giocate** simulate.
+    * **🟢 Semaforo Verde:** Raggiunte 300 giocate con **CLV Netto Medio > 0%** -> autorizzato il passaggio al **Pilota Reale Micro (0.5% = 5 €)**.
+    * **🚨 Allarme Rosso:** Se il *Max Drawdown* raggiunge il **15%**, sospendi l'operatività e rivedi i filtri.
     """)
+
