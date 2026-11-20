@@ -117,7 +117,9 @@ def scarica_stagioni(lista_stagioni):
                 falliti.append(f"{cod}_{s}")
                 continue
             try:
-                df = pd.read_csv(io.StringIO(txt), on_bad_lines='skip', encoding='latin-1')
+        
+                df = pd.read_csv(io.StringIO(txt), on_bad_lines='skip', encoding='utf-8-sig', engine='python')
+                df.columns = df.columns.str.replace('ï»¿', '')
                 df = rinomina_colonne_csv(df)
                 base = ['Date', 'HomeTeam', 'AwayTeam', 'FTHG', 'FTAG', 'B365H', 'B365D', 'B365A']
                 if not all(c in df.columns for c in base):
@@ -347,9 +349,14 @@ def analizza_palinsesto_futuro(db, elo_ratings, ultima_data, ultima_div, feat_co
     txt_fix = scarica_csv_veloce("https://www.football-data.co.uk/fixtures.csv", tentativi=2)
     if txt_fix is None:
         return pd.DataFrame(), "Impossibile scaricare fixtures.csv al momento."
-    df_fix = rinomina_colonne_csv(pd.read_csv(io.StringIO(txt_fix), on_bad_lines='skip', encoding='latin-1'))
-    if 'Div' not in df_fix.columns:
-        return pd.DataFrame(), "Palinsesto non disponibile."
+    try:
+        df_fix = pd.read_csv(io.StringIO(txt_fix), on_bad_lines='skip', encoding='utf-8-sig', engine='python')
+        df_fix.columns = df_fix.columns.str.replace('ï»¿', '')
+        if 'Div' not in df_fix.columns:
+            raise KeyError(f"Colonna 'Div' non trovata. Colonne disponibili: {list(df_fix.columns)}")
+        df_fix = rinomina_colonne_csv(df_fix)
+    except Exception as e:
+        return pd.DataFrame(), f"Errore lettura palinsesto: {e}"    
 
     df_fix = df_fix[df_fix['Div'].isin(list(CAMPIONATI.keys()))].dropna(subset=['Date', 'HomeTeam', 'AwayTeam', 'B365H', 'B365D', 'B365A']).copy()
     df_fix['Data_DT'] = pd.to_datetime(df_fix['Date'], dayfirst=True, format='mixed', errors='coerce')
