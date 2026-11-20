@@ -22,11 +22,14 @@ CAMPIONATI_TOP5 = {
 
 def invia_tg(testo):
     if TOKEN and CHAT_ID:
-        requests.post(
+        r = requests.post(
             f"https://api.telegram.org/bot{TOKEN}/sendMessage",
-            json={"chat_id": CHAT_ID, "text": testo, "parse_mode": "Markdown"},
+            json={"chat_id": CHAT_ID, "text": testo},
             timeout=15
         )
+        r.raise_for_status()
+
+
 
 def devig_power_col(df, cols):
     inv = 1.0 / df[cols].values.astype(float)
@@ -181,8 +184,9 @@ def esegui_controllo():
                 trovate.append(riga_msg)
                 if pd.notna(ko_ita):
                     minuti_mancanti = (ko_ita - oggi).total_seconds() / 60.0
-                    if 15 <= minuti_mancanti <= 105:
+                    if 20 <= minuti_mancanti <= 79:
                         imminenti.append(riga_msg)
+
 
     if giorno in (5, 6):
         if imminenti:
