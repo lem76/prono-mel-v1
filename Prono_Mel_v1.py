@@ -627,7 +627,7 @@ with tab_prono:
             cols_mostra = [c for c in ['Data', 'Ora_ITA', 'Campionato', 'Partita', 'Mercato', 'Quota_B365', 'Quota_Media', 'Quota_MAX', 'Prob_AI_Pct', 'EV_Pct', 'Puntata_Consigliata'] if c in df_seg.columns]
             st.dataframe(df_seg[cols_mostra], use_container_width=True)
 
-            )
+            
             if st.button("📲 Invia Pronostici su Telegram"):
                 ok_tg, msg_tg = invia_alert_telegram(df_seg)
                 if ok_tg:
