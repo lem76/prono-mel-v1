@@ -127,7 +127,12 @@ def esegui_controllo():
         df_fix.columns = df_fix.columns.str.replace('ï»¿', '')
         if 'Div' not in df_fix.columns:
             raise KeyError("Colonna Div non trovata")
-        df_fix = df_fix[df_fix['Div'].isin(list(CAMPIONATI_TOP5.keys()))].dropna(subset=['Date', 'HomeTeam', 'AwayTeam', 'B365H', 'B365D', 'B365A'])
+        df_fix = df_fix[df_fix['Div'].isin(list(CAMPIONATI_TOP5.keys()))].copy()
+        for c_b, c_avg in [('B365H', 'AvgH'), ('B365D', 'AvgD'), ('B365A', 'AvgA')]:
+            if c_avg in df_fix.columns:
+                df_fix[c_b] = df_fix[c_b].fillna(df_fix[c_avg])
+        df_fix = df_fix.dropna(subset=['Date', 'HomeTeam', 'AwayTeam', 'B365H', 'B365D', 'B365A']).copy()
+
         df_fix['Data_DT'] = pd.to_datetime(df_fix['Date'], dayfirst=True, format='mixed', errors='coerce')
         if 'Time' in df_fix.columns:
             dt_uk = pd.to_datetime(df_fix['Date'].astype(str) + ' ' + df_fix['Time'].fillna('15:00').astype(str), dayfirst=True, format='mixed', errors='coerce')
