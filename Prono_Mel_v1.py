@@ -668,6 +668,9 @@ with tab_prono:
                 prob_corretta = max(1.0, min(99.0, riga['Prob_AI_Pct'] + malus_pct))
                 book_scelto = st.text_input("Bookmaker / Exchange scelto", value="Miglior Quota ADM / Exchange")
                 quota_reale = st.number_input("Quota reale trovata", min_value=1.01, max_value=20.0, value=float(riga['Quota_MAX']), step=0.01)
+                puntata_default = max(1.0, round(float(riga['Puntata_Consigliata']) * 2.0) / 2.0)
+                puntata_reale = st.number_input("Puntata reale (€) [arrotondata per bookmaker]", min_value=1.0, max_value=1000.0, value=puntata_default, step=0.50)
+
                 ev_finale = ((prob_corretta / 100.0) * quota_reale - 1.0) * 100.0
 
                 variante = "Modello Base Congelato" if malus_pct == 0.0 else "Intervento Manuale (Assenze)"
@@ -687,7 +690,7 @@ with tab_prono:
                             'Variante_Modello': variante, 'Bookmaker': book_scelto,
                             'Quota_Presa': quota_reale, 'Quota_Chiusura': np.nan,
                             'Prob_AI_Pct': prob_corretta, 'Malus_Assenze_Pct': malus_pct,
-                            'Puntata_Euro': riga['Puntata_Consigliata'], 'Esito': 'In Corso',
+                            'Puntata_Euro': puntata_reale, 'Esito': 'In Corso',
                             'Profitto_Euro': 0.0, 'CLV_Netto_Pct': np.nan
                         }
                         df_tr = pd.concat([df_tr, pd.DataFrame([nuova_riga])], ignore_index=True)
