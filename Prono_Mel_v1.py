@@ -361,7 +361,7 @@ def analizza_palinsesto_futuro(db, elo_ratings, ultima_data, ultima_div, feat_co
     df_fix = df_fix[df_fix['Div'].isin(list(CAMPIONATI.keys()))].dropna(subset=['Date', 'HomeTeam', 'AwayTeam', 'B365H', 'B365D', 'B365A']).copy()
     df_fix['Data_DT'] = pd.to_datetime(df_fix['Date'], dayfirst=True, format='mixed', errors='coerce')
     oggi = pd.Timestamp.now().normalize()
-    df_fix = df_fix[df_fix['Data_DT'] <= oggi].copy()
+    df_fix = df_fix[df_fix['Data_DT'] >= oggi].copy()
 
     if solo_top5:
         df_fix = df_fix[df_fix['Div'].isin(['I1', 'E0', 'SP1', 'D1', 'F1'])].copy()
