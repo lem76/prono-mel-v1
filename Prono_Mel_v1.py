@@ -517,12 +517,13 @@ def invia_alert_telegram(df_seg):
         return False, f"Errore Telegram ({resp.status_code}): avvia prima la chat con il tuo bot."
     except Exception as e:
         return False, f"Errore invio Telegram: {e}"
-
+        
 def chiudi_partite_automatico(df_tr, db_storico):
     in_corso = df_tr[df_tr['Esito'] == 'In Corso']
     if in_corso.empty:
         return df_tr, 0
     chiuse_count = 0
+    col_q = {'1': 'AvgCH', 'X': 'AvgCD', '2': 'AvgCA', 'OVER 2.5': 'AvgC_Over25', 'UNDER 2.5': 'AvgC_Under25'}
     for idx in in_corso.index:
         partita_str = str(df_tr.loc[idx, 'Partita'])
         if " - " not in partita_str:
@@ -539,38 +540,32 @@ def chiudi_partite_automatico(df_tr, db_storico):
         if match_db.empty:
             continue
         rec = match_db.tail(1).to_dict(orient='records').pop(0)
-        hg, ag = float(rec['FTHG']), float(rec['FTAG'])
         mkt = str(df_tr.loc[idx, 'Mercato'])
+        q_close = rec.get(col_q.get(mkt, ''), np.nan)
+        if pd.isna(q_close) or float(q_close) <= 1.0:
+            continue
+
+        if mkt in ('1', 'X', '2'):
+            p_vec = devig_power_singolo([rec.get('AvgCH'), rec.get('AvgCD'), rec.get('AvgCA')])
+            p_close_clean = float(p_vec.item({'1': 0, 'X': 1, '2': 2}[mkt]))
+        else:
+            p_vec = devig_power_singolo([rec.get('AvgC_Over25'), rec.get('AvgC_Under25')])
+            p_close_clean = float(p_vec.item(0 if mkt == 'OVER 2.5' else 1))
+
+        if pd.isna(p_close_clean):
+            continue
+
+        hg, ag = float(rec['FTHG']), float(rec['FTAG'])
         stake_v = float(df_tr.loc[idx, 'Puntata_Euro'])
         q_presa = float(df_tr.loc[idx, 'Quota_Presa'])
 
-        vinta = False
-        q_close = np.nan
-        if mkt == '1':
-            vinta = hg > ag
-            q_close = rec.get('AvgCH', np.nan)
-        elif mkt == 'X':
-            vinta = hg == ag
-            q_close = rec.get('AvgCD', np.nan)
-        elif mkt == '2':
-            vinta = hg < ag
-            q_close = rec.get('AvgCA', np.nan)
-        elif mkt == 'OVER 2.5':
-            vinta = (hg + ag) > 2.5
-            q_close = rec.get('AvgC_Over25', np.nan)
-        elif mkt == 'UNDER 2.5':
-            vinta = (hg + ag) < 2.5
-            q_close = rec.get('AvgC_Under25', np.nan)
-
+        vinta = {'1': hg > ag, 'X': hg == ag, '2': hg < ag, 'OVER 2.5': (hg + ag) > 2.5, 'UNDER 2.5': (hg + ag) < 2.5}[mkt]
         esito_fin = "Vinta" if vinta else "Persa"
         prof_v = round(stake_v * (q_presa - 1.0), 2) if vinta else -stake_v
-        clv_net = np.nan
-        if pd.notna(q_close) and float(q_close) > 1.0:
-            p_close_clean = (1.0 / float(q_close)) / 1.025
-            clv_net = round(((q_presa * p_close_clean) - 1.0) * 100.0, 2)
+        clv_net = round(((q_presa * p_close_clean) - 1.0) * 100.0, 2)
 
         df_tr.loc[idx, 'Esito'] = esito_fin
-        df_tr.loc[idx, 'Quota_Chiusura'] = round(float(q_close), 2) if pd.notna(q_close) else np.nan
+        df_tr.loc[idx, 'Quota_Chiusura'] = round(float(q_close), 2)
         df_tr.loc[idx, 'Profitto_Euro'] = prof_v
         df_tr.loc[idx, 'CLV_Netto_Pct'] = clv_net
         chiuse_count += 1
