@@ -572,6 +572,8 @@ def chiudi_partite_automatico(df_tr, db_storico):
 
     return df_tr, chiuse_count
 
+    
+
 st.title("⚽ Prono Mel v1 — Motore Quantitativo & Profit Tracker")
 st.caption("Cloud Edition: Power Devig + Logit-Offset + Outcome Bias + Sincronizzazione Google Sheets")
 
