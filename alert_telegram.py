@@ -44,13 +44,18 @@ def devig_power_col(df, cols):
 def esegui_controllo():
     oggi = pd.Timestamp.now(tz="Europe/Rome")
     giorno = oggi.weekday()
+    ora_corr = oggi.hour
 
     if giorno == 0:
-        invia_tg("📅 *LUNEDÌ — PRONO MEL v1*\nRicordati di aprire l'app e premere *🔄 Chiudi Partite Concluse in Automatico* nella Scheda 2 per aggiornare CLV e Semaforo!")
+        if ora_corr == 10:
+            invia_tg("📅 *LUNEDÌ — PRONO MEL v1*\nRicordati di aprire l'app e premere *🔄 Chiudi Partite Concluse in Automatico* nella Scheda 2 per aggiornare CLV e Semaforo!")
         return
 
-    if giorno in (5, 6):
-        invia_tg("⏱️ *CHECK FORMAZIONI (T-45 min)*\nControlla su Diretta.it gli infortuni/titolari prima del calcio d'inizio e registra le giocate valide in *Prono Mel v1*.")
+    if giorno not in (3, 4, 5, 6):
+        return
+    if giorno == 3 and ora_corr != 18:
+        return
+    if giorno == 4 and ora_corr not in (11, 18, 19):
         return
 
     anno = oggi.year if oggi.month >= 7 else oggi.year - 1
@@ -117,22 +122,28 @@ def esegui_controllo():
 
     url_fix = "https://www.football-data.co.uk/fixtures.csv"
     r_fix = requests.get(url_fix, headers=HEADERS, timeout=15)
-    
+
     try:
         df_fix = pd.read_csv(io.StringIO(r_fix.text), on_bad_lines='skip', encoding='utf-8-sig', engine='python')
         df_fix.columns = df_fix.columns.str.replace('ï»¿', '')
         if 'Div' not in df_fix.columns:
             raise KeyError(f"Colonna 'Div' non trovata. Colonne disponibili: {list(df_fix.columns)}")
-            
+
         df_fix = df_fix[df_fix['Div'].isin(list(CAMPIONATI_TOP5.keys()))].dropna(subset=['Date', 'HomeTeam', 'AwayTeam', 'B365H', 'B365D', 'B365A'])
         df_fix['Data_DT'] = pd.to_datetime(df_fix['Date'], dayfirst=True, format='mixed', errors='coerce')
+        if 'Time' in df_fix.columns:
+            dt_uk = pd.to_datetime(df_fix['Date'].astype(str) + ' ' + df_fix['Time'].fillna('15:00').astype(str), dayfirst=True, format='mixed', errors='coerce')
+            df_fix['Kickoff_ITA'] = dt_uk.dt.tz_localize('Europe/London', ambiguous='NaT', nonexistent='NaT').dt.tz_convert('Europe/Rome')
+        else:
+            df_fix['Kickoff_ITA'] = pd.NaT
         df_fix = df_fix[df_fix['Data_DT'] >= pd.Timestamp.now().normalize()]
-        
+
     except Exception as e:
         invia_tg(f"⚠️ *ERRORE CRITICO NEL FIXTURES*: {e}")
         return
-   
+
     trovate = []
+    imminenti = []
     for _, row in df_fix.iterrows():
         ht, at = row['HomeTeam'], row['AwayTeam']
         avg_q = [float(row['AvgH']) if pd.notna(row.get('AvgH')) else float(row['B365H']),
@@ -156,12 +167,25 @@ def esegui_controllo():
             off_m = float(logit(np.clip(p_open.item(i), eps, 1 - eps)))
             p_raw[m] = float(expit(off_m + b0_m + (x_s @ b_m).item(0)))
         tot_p = sum(p_raw.values())
+        ko_ita = row['Kickoff_ITA']
+        ora_str = ko_ita.strftime('%H:%M') if pd.notna(ko_ita) else "N/D"
+
         for m in ['1', 'X', '2']:
             p_f = p_raw[m] / tot_p
             q_m = max_q[m]
             ev = (p_f * q_m) - 1.0
             if 1.35 <= q_m <= 4.00 and ev >= 0.03:
-                trovate.append(f"📅 {row['Date']} | *{CAMPIONATI_TOP5[row['Div']]}*\n🏟️ {ht} - {at} -> *{m}* @ *{q_m}* (EV: *+{ev*100:.1f}%*)")
+                riga_msg = f"📅 {row['Date']} ({ora_str}) | *{CAMPIONATI_TOP5[row['Div']]}*\n🏟️ {ht} - {at} -> *{m}* @ *{q_m}* (EV: *+{ev*100:.1f}%*)"
+                trovate.append(riga_msg)
+                if pd.notna(ko_ita):
+                    minuti_mancanti = (ko_ita - oggi).total_seconds() / 60.0
+                    if 15 <= minuti_mancanti <= 105:
+                        imminenti.append(riga_msg)
+
+    if giorno in (5, 6):
+        if imminenti:
+            invia_tg("⏱️ *ALERT PRE-PARTITA (CHECK FORMAZIONI T-45 min)* ⏱️\n\n" + "\n\n".join(imminenti) + "\n\n👉 Controlla formazioni su *Diretta.it* e registra in *Prono Mel v1*!")
+        return
 
     if trovate:
         invia_tg("⚽ *PRONO MEL v1 — SEGNALI WEEKEND* ⚽\n\n" + "\n\n".join(trovate) + "\n\n👉 Apri *Prono Mel v1* per Line Shopping e verifica!")
@@ -170,3 +194,4 @@ def esegui_controllo():
 
 if __name__ == "__main__":
     esegui_controllo()
+
