@@ -138,7 +138,8 @@ def cerca_migliore_quota_live(api_key, sport_key, casa, trasferta, mercato):
     if not api_key:
         return None, "Inserisci una API Key gratuita di The Odds API nella barra laterale."
     mkt_api = "totals" if "2.5" in mercato else "h2h"
-    url = f"https://the-odds-api.com{sport_key}/odds/?apiKey={api_key}&regions=eu,uk&markets={mkt_api}&oddsFormat=decimal"
+    url = f"https://api.the-odds-api.com/v4/sports/{sport_key}/odds/?apiKey={api_key}&regions=eu,uk&markets={mkt_api}&oddsFormat=decimal"
+
     try:
         r = requests.get(url, timeout=12)
         if r.status_code != 200:
