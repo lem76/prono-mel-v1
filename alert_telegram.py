@@ -40,10 +40,9 @@ def devig_power_col(df, cols):
     res = inv ** c[:, None]
     res[invalid] = np.nan
     return res
-
 def esegui_controllo():
     oggi = pd.Timestamp.now(tz="Europe/Rome")
-    giorno = oggi.weekday()
+    giorno = oggi.weekday()  # 0=Lun, 3=Gio, 4=Ven, 5=Sab, 6=Dom
     ora_corr = oggi.hour
 
     if giorno == 0:
@@ -55,10 +54,11 @@ def esegui_controllo():
         return
     if giorno == 3 and ora_corr != 18:
         return
-    if giorno == 4 and ora_corr not in (11, 18, 19):
+    if giorno == 4 and ora_corr not in (11, 18):
         return
 
     anno = oggi.year if oggi.month >= 7 else oggi.year - 1
+
     stagioni = [f"{str(y)[-2:]}{str(y + 1)[-2:]}" for y in range(2020, anno + 1)]
     fogli = []
     for cod in CAMPIONATI_TOP5.keys():
@@ -122,13 +122,11 @@ def esegui_controllo():
 
     url_fix = "https://www.football-data.co.uk/fixtures.csv"
     r_fix = requests.get(url_fix, headers=HEADERS, timeout=15)
-
     try:
         df_fix = pd.read_csv(io.StringIO(r_fix.text), on_bad_lines='skip', encoding='utf-8-sig', engine='python')
         df_fix.columns = df_fix.columns.str.replace('ï»¿', '')
         if 'Div' not in df_fix.columns:
-            raise KeyError(f"Colonna 'Div' non trovata. Colonne disponibili: {list(df_fix.columns)}")
-
+            raise KeyError("Colonna Div non trovata")
         df_fix = df_fix[df_fix['Div'].isin(list(CAMPIONATI_TOP5.keys()))].dropna(subset=['Date', 'HomeTeam', 'AwayTeam', 'B365H', 'B365D', 'B365A'])
         df_fix['Data_DT'] = pd.to_datetime(df_fix['Date'], dayfirst=True, format='mixed', errors='coerce')
         if 'Time' in df_fix.columns:
@@ -137,9 +135,8 @@ def esegui_controllo():
         else:
             df_fix['Kickoff_ITA'] = pd.NaT
         df_fix = df_fix[df_fix['Data_DT'] >= pd.Timestamp.now().normalize()]
-
     except Exception as e:
-        invia_tg(f"⚠️ *ERRORE CRITICO NEL FIXTURES*: {e}")
+        invia_tg(f"⚠️ *ERRORE LETTURA PALINSESTO*: {e}")
         return
 
     trovate = []
@@ -184,14 +181,17 @@ def esegui_controllo():
 
     if giorno in (5, 6):
         if imminenti:
-            invia_tg("⏱️ *ALERT PRE-PARTITA (CHECK FORMAZIONI T-45 min)* ⏱️\n\n" + "\n\n".join(imminenti) + "\n\n👉 Controlla formazioni su *Diretta.it* e registra in *Prono Mel v1*!")
+            msg_pre = "\n\n".join(imminenti)
+            invia_tg(f"⏱️ *ALERT PRE-PARTITA (CHECK FORMAZIONI T-45 min)* ⏱️\n\n{msg_pre}\n\n👉 Controlla formazioni su *Diretta.it* e registra in *Prono Mel v1*!")
         return
 
     if trovate:
-        invia_tg("⚽ *PRONO MEL v1 — SEGNALI WEEKEND* ⚽\n\n" + "\n\n".join(trovate) + "\n\n👉 Apri *Prono Mel v1* per Line Shopping e verifica!")
+        msg_wk = "\n\n".join(trovate)
+        invia_tg(f"⚽ *PRONO MEL v1 — SEGNALI WEEKEND* ⚽\n\n{msg_wk}\n\n👉 Apri *Prono Mel v1* per Line Shopping e verifica!")
     else:
         invia_tg("⚽ *PRONO MEL v1*: Nessuna partita nei Top 5 supera EV +3.0% oggi.")
 
 if __name__ == "__main__":
     esegui_controllo()
 
+    
