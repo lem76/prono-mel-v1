@@ -4,7 +4,7 @@ import time
 import warnings
 import requests
 import numpy as np
-import pandas as pddf_fix['Data_DT']
+import pandas as pd
 import streamlit as st
 from streamlit_gsheets import GSheetsConnection
 from scipy.optimize import brentq, minimize
