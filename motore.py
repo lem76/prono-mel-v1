@@ -100,7 +100,7 @@ def scarica_stagioni(lista_stagioni, codici_leghe=None):
     ]
     for cod in leghe:
         for s in lista_stagioni:
-            url = "https://football-data.co.uk" + f"/mmz4281/{s}/{cod}.csv"
+            url = "https://www.football-data.co.uk" + f"/mmz4281/{s}/{cod}.csv"
             txt = scarica_csv_veloce(url, tentativi=2)
             if txt is None:
                 falliti.append(f"{cod}_{s}")
@@ -433,7 +433,8 @@ def valuta_match_poisson(row, db, stagione_corr, mappa_quote):
 
 # BLOCCO 5: Lettura palinsesto futuro, ordinamento cronologico e cap giornaliero
 def analizza_palinsesto_futuro(db, elo_ratings, ultima_data, ultima_div, feat_cols, medie_feat, scaler, modelli, soglia_ev, flat_stake, budget_tot, solo_top5=True, modalita_motore="Entrambi (Logit + Poisson)"):
-    url_fix = "https://football-data.co.uk" + "/fixtures.csv"
+    
+    url_fix = "https://www.football-data.co.uk/fixtures.csv"
     txt_fix = scarica_csv_veloce(url_fix, tentativi=2)
     if txt_fix is None:
         return pd.DataFrame(), "Impossibile scaricare fixtures.csv al momento."
