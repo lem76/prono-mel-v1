@@ -491,10 +491,15 @@ with tab_tracker:
                 salva_tracker(df_tr_agg, budget_base=budget_totale)
                 st.success(f"Aggiornate automaticamente {n_agg} partite e sincronizzate le schede Google Sheets!")
                 st.rerun()
-            else:
-                st.info("Nessuna nuova partita conclusa con quote di chiusura pubblicate trovata nei CSV.")
+         else:
+             st.info("Nessuna nuova partita conclusa con quote di chiusura pubblicate trovata nei CSV.")
 
-        in_corso = df_tr[df_tr['Esito'] == 'In Corso']
+     if st.button("📤 Sincronizza Schede Confronto & Grafico su Google Sheets"):
+         salva_tracker(df_tr, budget_base=budget_totale)
+         st.success("Schede Tracker, Confronto_Strategie e Curva_Equity aggiornate su Google Sheets!")
+
+     in_corso = df_tr[df_tr['Esito'] == 'In Corso']
+
         if not in_corso.empty:
             id_sel = st.selectbox("Seleziona ID giocata da chiudere:", in_corso['ID'].tolist())
             r_sel = df_tr[df_tr['ID'] == id_sel].to_dict(orient='records').pop(0)
