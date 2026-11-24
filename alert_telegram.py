@@ -1,4 +1,4 @@
-# BOT ALERT TELEGRAM: Usa il motore condiviso (Logit + Poisson) con filtro orario anti-doppioni
+# BOT ALERT TELEGRAM: Motore condiviso + Esclusione automatica partite già giocate o scartate
 import os
 import requests
 import pandas as pd
@@ -6,6 +6,21 @@ from motore import costruisci_motore, analizza_palinsesto_futuro
 
 TOKEN = os.environ.get("TELEGRAM_TOKEN", "")
 CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "")
+GSHEET_ID = os.environ.get("GSHEET_ID", "")
+
+def carica_gia_gestite():
+    gia_gestite = set()
+    if not GSHEET_ID:
+        return gia_gestite
+    for foglio in ["Tracker", "Scarti"]:
+        try:
+            url_csv = f"https://google.com{GSHEET_ID}/gviz/tq?tqx=out:csv&sheet={foglio}"
+            df_f = pd.read_csv(url_csv)
+            if not df_f.empty and 'Partita' in df_f.columns and 'Mercato' in df_f.columns:
+                gia_gestite.update(zip(df_f['Partita'].astype(str), df_f['Mercato'].astype(str)))
+        except Exception:
+            pass
+    return gia_gestite
 
 def invia_tg(testo):
     if not TOKEN or not CHAT_ID:
@@ -38,9 +53,14 @@ def esegui_controllo():
         modalita_motore="Entrambi (Logit + Poisson)"
     )
 
+    if not df_seg.empty:
+        gia_gestite = carica_gia_gestite()
+        if gia_gestite:
+            df_seg = df_seg[~df_seg.apply(lambda r: (str(r['Partita']), str(r['Mercato'])) in gia_gestite, axis=1)].reset_index(drop=True)
+
     if df_seg.empty:
         if giorno in (3, 4):
-            invia_tg(f"⚽ PRONO MEL v1: {msg}")
+            invia_tg("⚽ PRONO MEL v1: Nessun nuovo segnale disponibile (o tutte le partite estratte sono già state giocate/scartate).")
         return
 
     trovate = []
