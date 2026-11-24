@@ -332,9 +332,7 @@ with tab_prono:
                 except Exception:
                     pass
             df_seg = df_seg[~df_seg.apply(lambda r: (str(r['Partita']), str(r['Mercato'])) in gia_gestite, axis=1)].reset_index(drop=True)
-        st.session_state['segnali_correnti'] = df_seg
-        st.session_state['msg_segnali'] = msg
-
+        
 
         st.session_state['segnali_correnti'] = df_seg
         st.session_state['msg_segnali'] = msg
