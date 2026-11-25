@@ -52,6 +52,24 @@ def esegui_controllo():
         return
     if giorno == 4 and ora_corr not in (11, 18):
         return
+        
+    if giorno in (5, 6):
+        if not (10 <= ora_corr <= 21):
+            return
+        try:
+            url_fix = "https://www." + "football-data.co.uk" + "/fixtures.csv"
+            r_fix = requests.get(url_fix, timeout=12)
+            df_chk = pd.read_csv(pd.io.common.StringIO(r_fix.text), on_bad_lines='skip', encoding='utf-8-sig', engine='python')
+            df_chk.columns = df_chk.columns.str.replace('ï»¿', '')
+            df_chk = df_chk[df_chk['Div'].isin(['I1', 'E0', 'SP1', 'D1', 'F1'])].copy()
+            dt_uk = pd.to_datetime(df_chk['Date'].astype(str) + ' ' + df_chk['Time'].fillna('15:00').astype(str), dayfirst=True, format='mixed', errors='coerce')
+            ko_ita = dt_uk.dt.tz_localize('Europe/London', ambiguous='NaT', nonexistent='NaT').dt.tz_convert('Europe/Rome')
+            min_manc = (ko_ita - oggi).dt.total_seconds() / 60.0
+            if not ((min_manc >= 20) & (min_manc <= 79)).any():
+                return
+        except Exception:
+            pass
+
 
     db, elo_ratings, ultima_data, ultima_div, feat_cols, medie_feat, scaler, modelli = costruisci_motore(usa_cache=False)
     df_seg, msg = analizza_palinsesto_futuro(
