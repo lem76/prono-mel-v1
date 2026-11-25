@@ -14,13 +14,20 @@ def carica_gia_gestite():
         return gia_gestite
     for foglio in ["Tracker", "Scarti"]:
         try:
-            url_csv = f"https://google.com{GSHEET_ID}/gviz/tq?tqx=out:csv&sheet={foglio}"
+            
+            url_csv = "https://docs." + "google.com" + f"/spreadsheets/d/{GSHEET_ID}/gviz/tq?tqx=out:csv&sheet={foglio}"
+
             df_f = pd.read_csv(url_csv)
-            if not df_f.empty and 'Partita' in df_f.columns and 'Mercato' in df_f.columns:
-                gia_gestite.update(zip(df_f['Partita'].astype(str), df_f['Mercato'].astype(str)))
+            if not df_f.empty and all(c in df_f.columns for c in ['Partita', 'Mercato', 'Data_Match']):
+                gia_gestite.update(zip(
+                    df_f['Partita'].astype(str).str.strip(),
+                    df_f['Mercato'].astype(str).str.strip(),
+                    df_f['Data_Match'].astype(str).str.strip()
+                ))
         except Exception:
             pass
     return gia_gestite
+
 
 def invia_tg(testo):
     if not TOKEN or not CHAT_ID:
@@ -56,7 +63,8 @@ def esegui_controllo():
     if not df_seg.empty:
         gia_gestite = carica_gia_gestite()
         if gia_gestite:
-            df_seg = df_seg[~df_seg.apply(lambda r: (str(r['Partita']), str(r['Mercato'])) in gia_gestite, axis=1)].reset_index(drop=True)
+            df_seg = df_seg[~df_seg.apply(lambda r: (str(r['Partita']).strip(), str(r['Mercato']).strip(), str(r['Data']).strip()) in gia_gestite, axis=1)].reset_index(drop=True)
+
 
     if df_seg.empty:
         if giorno in (3, 4):
