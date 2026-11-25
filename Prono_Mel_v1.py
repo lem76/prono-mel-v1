@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 from streamlit_gsheets import GSheetsConnection
+from difflib import SequenceMatcher
 from scipy.special import logit, expit
 from motore import (
     QUOTA_MIN, QUOTA_MAX, MAX_ESPOSIZIONE_GIORNO_PCT,
@@ -33,72 +34,100 @@ def cerca_migliore_quota_live(api_key, sport_key, casa, trasferta, riga_match):
     mercato = riga_match['Mercato']
     motore_nome = riga_match.get('Motore', 'Logit-Offset')
     mkt_api = "totals" if "2.5" in mercato else "h2h"
-    url = "https://api." + "the-odds-api.com" + f"/v4/sports/{sport_key}/odds/?apiKey={api_key}&regions=eu,uk&markets={mkt_api}&oddsFormat=decimal"
 
+    if "cache_lega_api" not in st.session_state:
+        st.session_state["cache_lega_api"] = {}
+    chiave_lega = f"{sport_key}_{mkt_api}"
 
     try:
-        r = requests.get(url, timeout=12)
-        if r.status_code != 200:
-            return None, None, f"Errore API ({r.status_code}): controlla la chiave."
-        dati = r.json()
-        casa_low, trasf_low = casa.lower()[:5], trasferta.lower()[:5]
-        eps = 1e-5
+        if chiave_lega in st.session_state["cache_lega_api"]:
+            dati = st.session_state["cache_lega_api"][chiave_lega]
+        else:
+            url = "https://api." + "the-odds-api.com" + f"/v4/sports/{sport_key}/odds/?apiKey={api_key}&regions=eu,uk&markets={mkt_api}&oddsFormat=decimal"
+            r = requests.get(url, timeout=12)
+            if r.status_code != 200:
+                return None, None, f"Errore API ({r.status_code}): controlla la chiave."
+            dati = r.json()
+            st.session_state["cache_lega_api"][chiave_lega] = dati
+
+        dt_target = pd.to_datetime(riga_match.get('Data_DT'), errors='coerce')
+        target_str = f"{casa.lower().strip()} vs {trasferta.lower().strip()}"
+        miglior_evento = None
+        miglior_score = 0.0
+
         for evento in dati:
-            h_ev = evento.get('home_team', '').lower()
-            a_ev = evento.get('away_team', '').lower()
-            if casa_low in h_ev or trasf_low in a_ev:
-                offerte = []
-                tutti_esiti = {'1': [], 'X': [], '2': [], 'OVER 2.5': [], 'UNDER 2.5': []}
-                for bk in evento.get('bookmakers', []):
-                    nome_bk = bk.get('title', 'Bookmaker')
-                    for m in bk.get('markets', []):
-                        for out in m.get('outcomes', []):
-                            nome_out = out.get('name', '')
-                            prezzo = float(out.get('price', 0.0))
-                            punto = out.get('point', None)
-                            if prezzo <= 1.0:
-                                continue
-                            esito_cod = None
-                            if nome_out == evento.get('home_team'):
-                                esito_cod = '1'
-                            elif nome_out == evento.get('away_team'):
-                                esito_cod = '2'
-                            elif nome_out.lower() == 'draw':
-                                esito_cod = 'X'
-                            elif nome_out.lower() == 'over' and punto == 2.5:
-                                esito_cod = 'OVER 2.5'
-                            elif nome_out.lower() == 'under' and punto == 2.5:
-                                esito_cod = 'UNDER 2.5'
-                            if esito_cod:
-                                tutti_esiti[esito_cod].append(prezzo)
-                                if esito_cod == mercato:
-                                    offerte.append({'Bookmaker': nome_bk, 'Quota Live': prezzo})
+            if pd.notna(dt_target) and evento.get('commence_time'):
+                dt_ev = pd.to_datetime(evento['commence_time'], utc=True, errors='coerce').tz_localize(None)
+                if pd.notna(dt_ev) and abs((dt_ev.normalize() - dt_target.normalize()).days) > 1:
+                    continue
+            h_ev = evento.get('home_team', '').lower().strip()
+            a_ev = evento.get('away_team', '').lower().strip()
+            ev_str = f"{h_ev} vs {a_ev}"
+            sim_tot = SequenceMatcher(None, target_str, ev_str).ratio()
+            sim_h = SequenceMatcher(None, casa.lower().strip(), h_ev).ratio()
+            sim_a = SequenceMatcher(None, trasferta.lower().strip(), a_ev).ratio()
+            score = 0.5 * sim_tot + 0.25 * sim_h + 0.25 * sim_a
+            if score > miglior_score and sim_h >= 0.45 and sim_a >= 0.45:
+                miglior_score = score
+                miglior_evento = evento
 
-                prob_live_ai = None
-                if motore_nome == 'Logit-Offset':
-                    if mercato in ('1', 'X', '2') and tutti_esiti['1'] and tutti_esiti['X'] and tutti_esiti['2']:
-                        med_q = [float(np.median(tutti_esiti['1'])), float(np.median(tutti_esiti['X'])), float(np.median(tutti_esiti['2']))]
-                        p_mkt_live = devig_power_singolo(med_q)
-                        adjs = [float(riga_match.get('Adj_1', 0.0)), float(riga_match.get('Adj_X', 0.0)), float(riga_match.get('Adj_2', 0.0))]
-                        p_raw_l = [float(expit(float(logit(np.clip(p_mkt_live.item(i), eps, 1 - eps))) + adjs[i])) for i in range(3)]
-                        s_l = sum(p_raw_l)
-                        idx_m = {'1': 0, 'X': 1, '2': 2}[mercato]
-                        prob_live_ai = round((p_raw_l[idx_m] / s_l) * 100.0, 2)
-                    elif mercato in ('OVER 2.5', 'UNDER 2.5') and tutti_esiti['OVER 2.5'] and tutti_esiti['UNDER 2.5']:
-                        med_q = [float(np.median(tutti_esiti['OVER 2.5'])), float(np.median(tutti_esiti['UNDER 2.5']))]
-                        p_mkt_live = devig_power_singolo(med_q)
-                        adjs = [float(riga_match.get('Adj_O25', 0.0)), float(riga_match.get('Adj_U25', 0.0))]
-                        p_raw_l = [float(expit(float(logit(np.clip(p_mkt_live.item(i), eps, 1 - eps))) + adjs[i])) for i in range(2)]
-                        s_l = sum(p_raw_l)
-                        idx_o = {'OVER 2.5': 0, 'UNDER 2.5': 1}[mercato]
-                        prob_live_ai = round((p_raw_l[idx_o] / s_l) * 100.0, 2)
+        if miglior_evento is None or miglior_score < 0.55:
+            return None, None, "Partita non ancora quotata o non abbinata con certezza su The Odds API."
 
-                if offerte:
-                    df_off = pd.DataFrame(offerte).sort_values(by='Quota Live', ascending=False).reset_index(drop=True)
-                    return df_off, prob_live_ai, "OK"
-        return None, None, "Partita non ancora quotata su The Odds API."
+        eps = 1e-5
+        offerte = []
+        tutti_esiti = {'1': [], 'X': [], '2': [], 'OVER 2.5': [], 'UNDER 2.5': []}
+        for bk in miglior_evento.get('bookmakers', []):
+            nome_bk = bk.get('title', 'Bookmaker')
+            for m in bk.get('markets', []):
+                for out in m.get('outcomes', []):
+                    nome_out = out.get('name', '')
+                    prezzo = float(out.get('price', 0.0))
+                    punto = out.get('point', None)
+                    if prezzo <= 1.0:
+                        continue
+                    esito_cod = None
+                    if nome_out == miglior_evento.get('home_team'):
+                        esito_cod = '1'
+                    elif nome_out == miglior_evento.get('away_team'):
+                        esito_cod = '2'
+                    elif nome_out.lower() == 'draw':
+                        esito_cod = 'X'
+                    elif nome_out.lower() == 'over' and punto == 2.5:
+                        esito_cod = 'OVER 2.5'
+                    elif nome_out.lower() == 'under' and punto == 2.5:
+                        esito_cod = 'UNDER 2.5'
+                    if esito_cod:
+                        tutti_esiti[esito_cod].append(prezzo)
+                        if esito_cod == mercato:
+                            offerte.append({'Bookmaker': nome_bk, 'Quota Live': prezzo})
+
+        prob_live_ai = None
+        if motore_nome == 'Logit-Offset':
+            if mercato in ('1', 'X', '2') and tutti_esiti['1'] and tutti_esiti['X'] and tutti_esiti['2']:
+                med_q = [float(np.median(tutti_esiti['1'])), float(np.median(tutti_esiti['X'])), float(np.median(tutti_esiti['2']))]
+                p_mkt_live = devig_power_singolo(med_q)
+                adjs = [float(riga_match.get('Adj_1', 0.0)), float(riga_match.get('Adj_X', 0.0)), float(riga_match.get('Adj_2', 0.0))]
+                p_raw_l = [float(expit(float(logit(np.clip(p_mkt_live.item(i), eps, 1 - eps))) + adjs[i])) for i in range(3)]
+                s_l = sum(p_raw_l)
+                idx_m = {'1': 0, 'X': 1, '2': 2}[mercato]
+                prob_live_ai = round((p_raw_l[idx_m] / s_l) * 100.0, 2)
+            elif mercato in ('OVER 2.5', 'UNDER 2.5') and tutti_esiti['OVER 2.5'] and tutti_esiti['UNDER 2.5']:
+                med_q = [float(np.median(tutti_esiti['OVER 2.5'])), float(np.median(tutti_esiti['UNDER 2.5']))]
+                p_mkt_live = devig_power_singolo(med_q)
+                adjs = [float(riga_match.get('Adj_O25', 0.0)), float(riga_match.get('Adj_U25', 0.0))]
+                p_raw_l = [float(expit(float(logit(np.clip(p_mkt_live.item(i), eps, 1 - eps))) + adjs[i])) for i in range(2)]
+                s_l = sum(p_raw_l)
+                idx_o = {'OVER 2.5': 0, 'UNDER 2.5': 1}[mercato]
+                prob_live_ai = round((p_raw_l[idx_o] / s_l) * 100.0, 2)
+
+        if offerte:
+            df_off = pd.DataFrame(offerte).sort_values(by='Quota Live', ascending=False).reset_index(drop=True)
+            return df_off, prob_live_ai, "OK"
+        return None, None, "Mercato non ancora quotato su The Odds API."
     except Exception as e:
         return None, None, f"Errore connessione: {e}"
+
 
 
 # BLOCCO 2: Gestione Google Sheets (Tracker, Scarti, Confronto_Strategie, Curva_Equity) e chiusura automatica
