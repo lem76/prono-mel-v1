@@ -464,8 +464,13 @@ def analizza_palinsesto_futuro(db, elo_ratings, ultima_data, ultima_div, feat_co
         df_fix['Kickoff_ITA'] = pd.NaT
         df_fix['Ora_ITA'] = 'N/D'
 
-    oggi = pd.Timestamp.now().normalize()
-    df_fix = df_fix[df_fix['Data_DT'] >= oggi].copy()
+    now_roma = pd.Timestamp.now(tz='Europe/Rome')
+    oggi = now_roma.tz_localize(None).normalize()
+    df_fix = df_fix[
+        (df_fix['Kickoff_ITA'].notna() & (df_fix['Kickoff_ITA'] > now_roma)) |
+        (df_fix['Kickoff_ITA'].isna() & (df_fix['Data_DT'] >= oggi))
+    ].copy()
+
 
     if solo_top5:
         df_fix = df_fix[df_fix['Div'].isin(['I1', 'E0', 'SP1', 'D1', 'F1'])].copy()
