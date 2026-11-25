@@ -353,16 +353,25 @@ with tab_prono:
             gia_gestite = set()
             df_tr_es = carica_tracker()
             if not df_tr_es.empty:
-                gia_gestite.update(zip(df_tr_es['Partita'].astype(str), df_tr_es['Mercato'].astype(str)))
+                gia_gestite.update(zip(
+                    df_tr_es['Partita'].astype(str).str.strip(),
+                    df_tr_es['Mercato'].astype(str).str.strip(),
+                    df_tr_es['Data_Match'].astype(str).str.strip()
+                 ))
             conn_sc = get_gsheets_conn()
             if conn_sc is not None:
                 try:
                     df_sc_es = conn_sc.read(worksheet="Scarti", ttl=0)
-                    if df_sc_es is not None and not df_sc_es.empty:
-                        gia_gestite.update(zip(df_sc_es['Partita'].astype(str), df_sc_es['Mercato'].astype(str)))
+                    if df_sc_es is not None and not df_sc_es.empty and 'Data_Match' in df_sc_es.columns:
+                        gia_gestite.update(zip(
+                            df_sc_es['Partita'].astype(str).str.strip(),
+                            df_sc_es['Mercato'].astype(str).str.strip(),
+                            df_sc_es['Data_Match'].astype(str).str.strip()
+                        ))
                 except Exception:
                     pass
-            df_seg = df_seg[~df_seg.apply(lambda r: (str(r['Partita']), str(r['Mercato'])) in gia_gestite, axis=1)].reset_index(drop=True)
+            df_seg = df_seg[~df_seg.apply(lambda r: (str(r['Partita']).strip(), str(r['Mercato']).strip(), str(r['Data']).strip()) in gia_gestite, axis=1)].reset_index(drop=True)
+
         
 
         st.session_state['segnali_correnti'] = df_seg
