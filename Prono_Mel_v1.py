@@ -512,12 +512,15 @@ with tab_tracker:
 
         st.progress(min(1.0, n_clv_valide / 300.0), text=f"Avanzamento Validazione Paper Trading: {n_clv_valide} su 300 giocate con CLV valido")
 
+        se_clv = float(clv_s.std(ddof=1) / np.sqrt(n_clv_valide)) if n_clv_valide > 1 else np.inf
         if dd_pct >= 15.0:
             st.error("🚨 STOP-LOSS SCATTATO: Drawdown >= 15%. Sospendere le giocate e rivedere i parametri!")
-        elif n_clv_valide >= 300 and clv_medio > 0 and dd_pct < 15.0:
-            st.success("🟢 SEMAFORO VERDE: Criteri di promozione raggiunti! Puoi avviare il Pilota Reale Micro (0.5%).")
+        elif n_clv_valide >= 300 and (clv_medio - 2.0 * se_clv) > 0 and dd_pct < 15.0 and filtro_var != "Tutte":
+            st.success(f"🟢 SEMAFORO VERDE ({filtro_var}): Significatività statistica raggiunta (CLV {clv_medio:+.2f}% ± {2*se_clv:.2f}%)! Puoi avviare il Pilota Reale Micro (0.5%).")
         else:
-            st.warning("🟡 SEMAFORO GIALLO: Continua il Paper Trading fino a 300 giocate con CLV netto positivo.")
+            nota_filtro = " Seleziona una singola variante dal menu sopra per verificare il Semaforo Verde." if filtro_var == "Tutte" else ""
+            st.warning(f"🟡 SEMAFORO GIALLO: Continua il Paper Trading fino a 300 giocate con CLV significativamente > 0.{nota_filtro}")
+
 
         df_comp, df_eq = genera_tabelle_comparative(df_tr, budget_base=budget_totale)
         if not df_eq.empty and len(df_eq) > 1:
