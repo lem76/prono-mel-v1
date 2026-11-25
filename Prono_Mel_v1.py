@@ -115,22 +115,20 @@ def carica_tracker():
         'Prob_AI_Pct', 'Malus_Assenze_Pct', 'Puntata_Euro', 'Esito', 'Profitto_Euro', 'CLV_Netto_Pct'
     ]
     conn = get_gsheets_conn()
-    if conn is not None:
-        try:
-            df = conn.read(worksheet="Tracker", ttl=0)
-            if df is not None and not df.empty:
-                df = df.dropna(how='all').reset_index(drop=True)
-                if 'Data_Log' not in df.columns:
-                    df.insert(1, 'Data_Log', '')
-                return df
-        except Exception:
-            pass
-    if os.path.exists("prono_mel_tracker.csv"):
-        df = pd.read_csv("prono_mel_tracker.csv")
-        if 'Data_Log' not in df.columns:
-            df.insert(1, 'Data_Log', '')
-        return df
-    return pd.DataFrame(columns=colonne)
+    if conn is None:
+        st.error("🚨 Connessione a Google Sheets non configurata nei Secrets. Operazione bloccata per proteggere i dati.")
+        st.stop()
+    try:
+        df = conn.read(worksheet="Tracker", ttl=0)
+        if df is not None and not df.empty:
+            df = df.dropna(how='all').reset_index(drop=True)
+            if 'Data_Log' not in df.columns:
+                df.insert(1, 'Data_Log', '')
+            return df
+        return pd.DataFrame(columns=colonne)
+    except Exception as e:
+        st.error(f"🚨 Errore di lettura da Google Sheets ({e}). Operazione bloccata per evitare di sovrascrivere lo storico! Ricarica la pagina.")
+        st.stop()
 
 def genera_tabelle_comparative(df_tr, budget_base=1000.0):
     chiuse = df_tr[df_tr['Esito'].isin(['Vinta', 'Persa'])].copy()
@@ -172,32 +170,35 @@ def genera_tabelle_comparative(df_tr, budget_base=1000.0):
 def salva_tracker(df_tr, budget_base=1000.0):
     df_tr.to_csv("prono_mel_tracker.csv", index=False)
     conn = get_gsheets_conn()
-    if conn is not None:
-        try:
-            conn.update(worksheet="Tracker", data=df_tr)
-            df_comp, df_eq = genera_tabelle_comparative(df_tr, budget_base=budget_base)
-            if not df_comp.empty:
-                conn.update(worksheet="Confronto_Strategie", data=df_comp)
-            if not df_eq.empty:
-                conn.update(worksheet="Curva_Equity", data=df_eq)
-        except Exception:
-            pass
+    if conn is None:
+        st.error("🚨 Impossibile salvare: connessione Google Sheets assente.")
+        st.stop()
+    try:
+        conn.update(worksheet="Tracker", data=df_tr)
+        df_comp, df_eq = genera_tabelle_comparative(df_tr, budget_base=budget_base)
+        if not df_comp.empty:
+            conn.update(worksheet="Confronto_Strategie", data=df_comp)
+        if not df_eq.empty:
+            conn.update(worksheet="Curva_Equity", data=df_eq)
+    except Exception as e:
+        st.error(f"🚨 Errore durante il salvataggio su Google Sheets: {e}")
+        st.stop()
 
 def registra_scarto(riga_dict):
     df_sc = pd.DataFrame([riga_dict])
     conn = get_gsheets_conn()
-    if conn is not None:
-        try:
-            esistente = conn.read(worksheet="Scarti", ttl=0)
-            if esistente is not None and not esistente.empty:
-                df_sc = pd.concat([esistente.dropna(how='all'), df_sc], ignore_index=True)
-            conn.update(worksheet="Scarti", data=df_sc)
-            return
-        except Exception:
-            pass
-    if os.path.exists("prono_mel_scarti.csv"):
-        df_sc = pd.concat([pd.read_csv("prono_mel_scarti.csv"), df_sc], ignore_index=True)
-    df_sc.to_csv("prono_mel_scarti.csv", index=False)
+    if conn is None:
+        st.error("🚨 Connessione Google Sheets assente: impossibile salvare lo scarto.")
+        st.stop()
+    try:
+        esistente = conn.read(worksheet="Scarti", ttl=0)
+        if esistente is not None and not esistente.empty:
+            df_sc = pd.concat([esistente.dropna(how='all'), df_sc], ignore_index=True)
+        conn.update(worksheet="Scarti", data=df_sc)
+    except Exception as e:
+        st.error(f"🚨 Errore salvataggio nella scheda Scarti su Google Sheets: {e}")
+        st.stop()
+
 
 @st.cache_resource(show_spinner="Caricamento storico e addestramento motori Prono Mel v1...")
 def prepara_motore_predittivo(forza_aggiornamento=False):
