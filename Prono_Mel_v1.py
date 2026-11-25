@@ -33,7 +33,8 @@ def cerca_migliore_quota_live(api_key, sport_key, casa, trasferta, riga_match):
     mercato = riga_match['Mercato']
     motore_nome = riga_match.get('Motore', 'Logit-Offset')
     mkt_api = "totals" if "2.5" in mercato else "h2h"
-    url = f"https://the-odds-api.com{sport_key}/odds/?apiKey={api_key}&regions=eu,uk&markets={mkt_api}&oddsFormat=decimal"
+    url = "https://api." + "the-odds-api.com" + f"/v4/sports/{sport_key}/odds/?apiKey={api_key}&regions=eu,uk&markets={mkt_api}&oddsFormat=decimal"
+
 
     try:
         r = requests.get(url, timeout=12)
