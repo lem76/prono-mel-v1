@@ -546,36 +546,52 @@ with tab_tracker:
             st.success("Schede Tracker, Confronto_Strategie e Curva_Equity aggiornate su Google Sheets!")
 
         in_corso = df_tr[df_tr['Esito'] == 'In Corso']
-
-
         if not in_corso.empty:
             id_sel = st.selectbox("Seleziona ID giocata da chiudere:", in_corso['ID'].tolist())
             r_sel = df_tr[df_tr['ID'] == id_sel].to_dict(orient='records').pop(0)
+            mkt_sel = str(r_sel['Mercato'])
 
-            st.write(f"**{r_sel['Partita']}** — Mercato: **{r_sel['Mercato']}** @ **{r_sel['Quota_Presa']}** (Puntata: {r_sel['Puntata_Euro']} €)")
-            c_e1, c_e2, c_e3 = st.columns(3)
-            with c_e1:
-                nuovo_esito = st.selectbox("Esito Finale", ["Vinta", "Persa", "Rimborsata"])
-            with c_e2:
-                q_chiusura = st.number_input("Quota Chiusura Reale (al calcio d'inizio)", min_value=1.01, max_value=25.0, value=float(r_sel['Quota_Presa']), step=0.01)
-            with c_e3:
-                aggio_chiusura = st.number_input("Aggio stimato chiusura (%)", min_value=0.0, max_value=10.0, value=4.5, step=0.5)
+            st.write(f"**{r_sel['Partita']}** — Mercato: **{mkt_sel}** @ **{r_sel['Quota_Presa']}** (Puntata: {r_sel['Puntata_Euro']} €)")
+            nuovo_esito = st.selectbox("Esito Finale", ["Vinta", "Persa", "Rimborsata"])
+
+            if mkt_sel in ('1', 'X', '2'):
+                c_q1, c_qx, c_q2 = st.columns(3)
+                with c_q1:
+                    qc_1 = st.number_input("Chiusura Segno 1", min_value=1.01, max_value=30.0, value=float(r_sel['Quota_Presa']) if mkt_sel == '1' else 2.00, step=0.01)
+                with c_qx:
+                    qc_x = st.number_input("Chiusura Segno X", min_value=1.01, max_value=30.0, value=float(r_sel['Quota_Presa']) if mkt_sel == 'X' else 3.30, step=0.01)
+                with c_q2:
+                    qc_2 = st.number_input("Chiusura Segno 2", min_value=1.01, max_value=30.0, value=float(r_sel['Quota_Presa']) if mkt_sel == '2' else 3.50, step=0.01)
+                p_dev = devig_power_singolo([qc_1, qc_x, qc_2])
+                idx_m = {'1': 0, 'X': 1, '2': 2}[mkt_sel]
+                q_chiusura = [qc_1, qc_x, qc_2][idx_m]
+                p_close_clean = float(p_dev.item(idx_m))
+            else:
+                c_qo, c_qu = st.columns(2)
+                with c_qo:
+                    qc_o = st.number_input("Chiusura OVER 2.5", min_value=1.01, max_value=30.0, value=float(r_sel['Quota_Presa']) if mkt_sel == 'OVER 2.5' else 1.90, step=0.01)
+                with c_qu:
+                    qc_u = st.number_input("Chiusura UNDER 2.5", min_value=1.01, max_value=30.0, value=float(r_sel['Quota_Presa']) if mkt_sel == 'UNDER 2.5' else 1.90, step=0.01)
+                p_dev = devig_power_singolo([qc_o, qc_u])
+                idx_o = {'OVER 2.5': 0, 'UNDER 2.5': 1}[mkt_sel]
+                q_chiusura = [qc_o, qc_u][idx_o]
+                p_close_clean = float(p_dev.item(idx_o))
 
             if st.button("💾 Salva Chiusura Giocata"):
                 idx_row = df_tr[df_tr['ID'] == id_sel].index.tolist().pop(0)
                 stake_v = float(df_tr.loc[idx_row, 'Puntata_Euro'])
                 q_presa = float(df_tr.loc[idx_row, 'Quota_Presa'])
                 prof_v = round(stake_v * (q_presa - 1.0), 2) if nuovo_esito == "Vinta" else (-stake_v if nuovo_esito == "Persa" else 0.0)
-                p_close_clean = (1.0 / q_chiusura) / (1.0 + aggio_chiusura / 100.0)
-                clv_net = round(((q_presa * p_close_clean) - 1.0) * 100.0, 2)
+                clv_net = round(((q_presa * p_close_clean) - 1.0) * 100.0, 2) if pd.notna(p_close_clean) else np.nan
 
                 df_tr.loc[idx_row, 'Esito'] = nuovo_esito
                 df_tr.loc[idx_row, 'Quota_Chiusura'] = q_chiusura
                 df_tr.loc[idx_row, 'Profitto_Euro'] = prof_v
                 df_tr.loc[idx_row, 'CLV_Netto_Pct'] = clv_net
                 salva_tracker(df_tr, budget_base=budget_totale)
-                st.success(f"Esito salvato! Profitto: {prof_v:+.2f} € | CLV Netto: {clv_net:+.2f}%")
+                st.success(f"Esito salvato con Power Devig reale! Profitto: {prof_v:+.2f} € | CLV Netto: {clv_net:+.2f}%")
                 st.rerun()
+
 
         st.markdown("### 📋 Registro Completo Giocate")
         st.dataframe(df_view.sort_values(by='ID', ascending=False), use_container_width=True)
