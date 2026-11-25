@@ -508,7 +508,11 @@ def analizza_palinsesto_futuro(db, elo_ratings, ultima_data, ultima_div, feat_co
     if not segnali:
         return pd.DataFrame(), "Nessun segnale supera i filtri di sicurezza dei motori selezionati."
 
-    df_seg = pd.DataFrame(segnali).sort_values(by=['Data_DT', 'Ora_ITA', 'EV_Pct'], ascending=[True, True, False]).reset_index(drop=True)
+    
+    df_seg = pd.DataFrame(segnali).sort_values(by=['EV_Pct'], ascending=False)
+    df_seg = df_seg.drop_duplicates(subset=['Motore', 'Partita', 'Data'], keep='first')
+    df_seg = df_seg.sort_values(by=['Data_DT', 'Ora_ITA', 'EV_Pct'], ascending=[True, True, False]).reset_index(drop=True)
+
     cap_euro = budget_tot * MAX_ESPOSIZIONE_GIORNO_PCT
     for dt_v, grp in df_seg[df_seg['Motore'] == 'Logit-Offset'].groupby('Data'):
         tot_d = grp['Puntata_Consigliata'].sum()
