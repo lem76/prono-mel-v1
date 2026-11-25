@@ -162,15 +162,17 @@ def costruisci_motore(forza_aggiornamento=False, usa_cache=True):
     anno_corr = oggi_dt.year if oggi_dt.month >= 7 else oggi_dt.year - 1
     stagione_corr = f"{str(anno_corr)[-2:]}{str(anno_corr + 1)[-2:]}"
     stagioni_pass = [f"{str(y)[-2:]}{str(y + 1)[-2:]}" for y in range(2019, anno_corr)]
+    file_cache_dinamico = f"cache_prono_mel_fino_{stagioni_pass[-1]}.csv"
 
-    if usa_cache and os.path.exists(FILE_CACHE_STORICO) and not forza_aggiornamento:
-        df_pass = pd.read_csv(FILE_CACHE_STORICO)
+    if usa_cache and os.path.exists(file_cache_dinamico) and not forza_aggiornamento:
+        df_pass = pd.read_csv(file_cache_dinamico)
         if 'Stagione' not in df_pass.columns:
             df_pass['Stagione'] = 'pass'
     else:
         df_pass, falliti = scarica_stagioni(stagioni_pass)
         if usa_cache and not falliti and not df_pass.empty:
-            df_pass.to_csv(FILE_CACHE_STORICO, index=False)
+            df_pass.to_csv(file_cache_dinamico, index=False)
+
 
     df_curr, _ = scarica_stagioni([stagione_corr])
     db = pd.concat([df_pass, df_curr], ignore_index=True)
