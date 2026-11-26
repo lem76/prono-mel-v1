@@ -1,6 +1,7 @@
 # BLOCCO 1: Importazioni, controllo accesso password e comparatore quote live (The Odds API)
 import os
 import requests
+import time
 import numpy as np
 import pandas as pd
 import streamlit as st
@@ -40,15 +41,17 @@ def cerca_migliore_quota_live(api_key, sport_key, casa, trasferta, riga_match):
     chiave_lega = f"{sport_key}_{mkt_api}"
 
     try:
-        if chiave_lega in st.session_state["cache_lega_api"]:
-            dati = st.session_state["cache_lega_api"][chiave_lega]
+        ora_sec = time.time()
+        if chiave_lega in st.session_state["cache_lega_api"] and (ora_sec - st.session_state["cache_lega_api"][chiave_lega][0]) < 600:
+            dati = st.session_state["cache_lega_api"][chiave_lega][1]
         else:
             url = "https://api." + "the-odds-api.com" + f"/v4/sports/{sport_key}/odds/?apiKey={api_key}&regions=eu,uk&markets={mkt_api}&oddsFormat=decimal"
             r = requests.get(url, timeout=12)
             if r.status_code != 200:
                 return None, None, f"Errore API ({r.status_code}): controlla la chiave."
             dati = r.json()
-            st.session_state["cache_lega_api"][chiave_lega] = dati
+            st.session_state["cache_lega_api"][chiave_lega] = (ora_sec, dati)
+
 
         dt_target = pd.to_datetime(riga_match.get('Data_DT'), errors='coerce')
         target_str = f"{casa.lower().strip()} vs {trasferta.lower().strip()}"
@@ -406,9 +409,14 @@ with tab_prono:
                 if "cache_odds_live" not in st.session_state:
                     st.session_state["cache_odds_live"] = {}
                 chiave_match = f"{riga['Motore']}_{riga['Partita']}_{riga['Mercato']}"
+                
                 if st.button("🔎 Cerca Quota Migliore & Consenso Live"):
                     df_live, p_live_ai, esito_api = cerca_migliore_quota_live(odds_api_key, riga['Sport_Key'], riga['Casa'], riga['Trasferta'], riga)
                     st.session_state["cache_odds_live"][chiave_match] = (df_live, p_live_ai, esito_api)
+                    if df_live is not None and not df_live.empty:
+                        st.session_state[f"q_best_{chiave_match}"] = float(df_live['Quota Live'].iloc[0])
+
+                    
                 if chiave_match in st.session_state["cache_odds_live"]:
                     df_live_saved, p_live_saved, esito_saved = st.session_state["cache_odds_live"][chiave_match]
                     if df_live_saved is not None:
@@ -427,7 +435,9 @@ with tab_prono:
                 malus_pct = st.slider("Malus Assenze / Infortuni Extra (%)", min_value=-10.0, max_value=10.0, value=0.0, step=0.5)
                 prob_corretta = max(1.0, min(99.0, prob_base_usata + malus_pct))
                 book_scelto = st.text_input("Bookmaker / Exchange scelto", value="Miglior Quota ADM / Exchange")
-                quota_reale = st.number_input("Quota reale trovata", min_value=1.01, max_value=20.0, value=float(riga['Quota_MAX']), step=0.01)
+                
+                q_init = st.session_state.get(f"q_best_{chiave_match}", float(riga['Quota_MAX']))
+                quota_reale = st.number_input("Quota reale trovata (ADM / Exchange netta)", min_value=1.01, max_value=30.0, value=q_init, step=0.01)
 
                 p_dec = prob_corretta / 100.0
                 ev_finale = ((p_dec * quota_reale) - 1.0) * 100.0
