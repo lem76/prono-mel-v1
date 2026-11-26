@@ -33,8 +33,10 @@ def invia_tg(testo):
     if not TOKEN or not CHAT_ID:
         return
     url_tg = "https://api." + "telegram.org" + f"/bot{TOKEN}/sendMessage"
-    r = requests.post(url_tg, json={"chat_id": CHAT_ID, "text": testo}, timeout=15)
-    r.raise_for_status()
+    for i in range(0, len(testo), 3800):
+        r = requests.post(url_tg, json={"chat_id": CHAT_ID, "text": testo[i:i+3800]}, timeout=15)
+        r.raise_for_status()
+
 
 def esegui_controllo():
     oggi = pd.Timestamp.now(tz="Europe/Rome")
