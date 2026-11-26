@@ -358,22 +358,23 @@ with tab_prono:
                     df_tr_es['Mercato'].astype(str).str.strip(),
                     df_tr_es['Data_Match'].astype(str).str.strip()
                  ))
+            
             conn_sc = get_gsheets_conn()
             if conn_sc is not None:
                 try:
                     df_sc_es = conn_sc.read(worksheet="Scarti", ttl=0)
-                    if df_sc_es is not None and not df_sc_es.empty and 'Data_Match' in df_sc_es.columns:
-                        gia_gestite.update(zip(
-                            df_sc_es['Partita'].astype(str).str.strip(),
-                            df_sc_es['Mercato'].astype(str).str.strip(),
-                            df_sc_es['Data_Match'].astype(str).str.strip()
-                        ))
+                    if df_sc_es is not None and not df_sc_es.empty:
+                        for _, r_sc in df_sc_es.iterrows():
+                            dm_sc = str(r_sc['Data_Match']).strip() if 'Data_Match' in df_sc_es.columns and pd.notna(r_sc.get('Data_Match')) else ''
+                            gia_gestite.add((str(r_sc['Partita']).strip(), str(r_sc['Mercato']).strip(), dm_sc))
                 except Exception:
                     pass
-            df_seg = df_seg[~df_seg.apply(lambda r: (str(r['Partita']).strip(), str(r['Mercato']).strip(), str(r['Data']).strip()) in gia_gestite, axis=1)].reset_index(drop=True)
-
+          df_seg = df_seg[~df_seg.apply(lambda r: (
+              (str(r['Partita']).strip(), str(r['Mercato']).strip(), str(r['Data']).strip()) in gia_gestite or
+              (str(r['Partita']).strip(), str(r['Mercato']).strip(), '') in gia_gestite
+          ), axis=1)].reset_index(drop=True)
+  
         
-
         st.session_state['segnali_correnti'] = df_seg
         st.session_state['msg_segnali'] = msg
 
@@ -480,6 +481,7 @@ with tab_prono:
                     if st.button("🗑️ Scarta e Archivia Decisione"):
                         registra_scarto({
                             'Data_Log': pd.Timestamp.now(tz="Europe/Rome").strftime("%Y-%m-%d %H:%M"),
+                            'Data_Match': riga['Data'], 'Motore': riga['Motore'],
                             'Partita': riga['Partita'], 'Mercato': riga['Mercato'],
                             'Quota_Rif': quota_reale, 'EV_Finale_Pct': round(ev_finale, 2),
                             'Motivo': motivo_scarto
