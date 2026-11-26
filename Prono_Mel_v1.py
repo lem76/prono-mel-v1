@@ -423,8 +423,7 @@ with tab_prono:
                 if st.button("🔎 Cerca Quota Migliore & Consenso Live"):
                     df_live, p_live_ai, esito_api = cerca_migliore_quota_live(odds_api_key, riga['Sport_Key'], riga['Casa'], riga['Trasferta'], riga)
                     st.session_state["cache_odds_live"][chiave_match] = (df_live, p_live_ai, esito_api)
-                    if df_live is not None and not df_live.empty:
-                        st.session_state[f"q_best_{chiave_match}"] = float(df_live['Quota Live'].iloc[0])
+                    
 
                     
                 if chiave_match in st.session_state["cache_odds_live"]:
@@ -446,8 +445,9 @@ with tab_prono:
                 prob_corretta = max(1.0, min(99.0, prob_base_usata + malus_pct))
                 book_scelto = st.text_input("Bookmaker / Exchange scelto", value="Miglior Quota ADM / Exchange")
                 
-                q_init = st.session_state.get(f"q_best_{chiave_match}", float(riga['Quota_MAX']))
-                quota_reale = st.number_input("Quota reale trovata (ADM / Exchange netta)", min_value=1.01, max_value=30.0, value=q_init, step=0.01)
+                
+                quota_reale = st.number_input("Quota reale trovata (ADM / Exchange netta)", min_value=1.01, max_value=30.0, value=float(riga['Quota_MAX']), step=0.01)
+
 
                 p_dec = prob_corretta / 100.0
                 ev_finale = ((p_dec * quota_reale) - 1.0) * 100.0
