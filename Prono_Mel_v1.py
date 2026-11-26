@@ -394,8 +394,10 @@ with tab_prono:
         if df_seg.empty:
             st.warning(st.session_state.get('msg_segnali', 'Nessun segnale trovato o tutte le partite sono già state gestite.'))
         else:
-            cols_mostra = [c for c in ['Motore', 'Data', 'Ora_ITA', 'Campionato', 'Partita', 'Mercato', 'Quota_B365', 'Quota_Media', 'Quota_MAX', 'Prob_AI_Pct', 'EV_Pct', 'Puntata_Consigliata'] if c in df_seg.columns]
+            cols_mostra = [c for c in ['Motore', 'Data', 'Ora_ITA', 'Campionato', 'Partita', 'Mercato', 'Quota_B365', 'Quota_Media', 'Quota_MAX', 'Prob_AI_Pct', 'EV_Pct', 'EV_su_Media_Pct', 'Puntata_Consigliata'] if c in df_seg.columns]
             st.dataframe(df_seg[cols_mostra], use_container_width=True)
+            
+
 
             if st.button("📲 Invia Pronostici su Telegram"):
                 ok_tg, msg_tg = invia_alert_telegram(df_seg)
