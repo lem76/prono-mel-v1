@@ -460,6 +460,8 @@ def analizza_palinsesto_futuro(db, elo_ratings, ultima_data, ultima_div, feat_co
         r.raise_for_status()
         df_fix = pd.read_csv(pd.io.common.StringIO(r.text), on_bad_lines='skip', encoding='utf-8-sig', engine='python')
         df_fix.columns = df_fix.columns.str.replace('ï»¿', '').str.strip()
+        df_fix = rinomina_colonne_csv(df_fix)
+
     except Exception as e:
         return pd.DataFrame(), f"Impossibile scaricare il palinsesto futuro: {e}"
 
