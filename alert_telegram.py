@@ -95,7 +95,9 @@ def esegui_controllo():
     trovate = []
     imminenti = []
     for _, r in df_seg.iterrows():
-        riga_msg = f"[{r['Motore']}] 📅 {r['Data']} ({r['Ora_ITA']}) | {r['Campionato']}\n🏟️ {r['Partita']} -> {r['Mercato']} @ {r['Quota_MAX']} (EV: +{r['EV_Pct']}%)"
+        
+        riga_msg = f"[{r['Motore']}] 📅 {r['Data']} ({r['Ora_ITA']}) | [{r['Campionato']}]\n⚽ {r['Partita']} -> {r['Mercato']} @ {r['Quota_MAX']} (EV: +{r['EV_Pct']}% | su Media: {r.get('EV_su_Media_Pct', 'N/D')}%)"
+
         trovate.append(riga_msg)
         ko_ita = r['Kickoff_ITA']
         if pd.notna(ko_ita):
