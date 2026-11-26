@@ -447,35 +447,34 @@ def valuta_match_poisson(row, db, stagione_corr, mappa_quote):
 
 
 # BLOCCO 5: Lettura palinsesto futuro, ordinamento cronologico e cap giornaliero
-def analizza_palinsesto_futuro(db, elo_ratings, ultima_data, ultima_div, feat_cols, medie_feat, scaler, modelli, soglia_ev, flat_stake, budget_tot, solo_top5=True, modalita_motore="Entrambi (Logit + Poisson)"):
-    
-    url_fix = "https://www.football-data.co.uk/fixtures.csv"
-    txt_fix = scarica_csv_veloce(url_fix, tentativi=2)
-    if txt_fix is None:
-        return pd.DataFrame(), "Impossibile scaricare fixtures.csv al momento."
+def analizza_palinsesto_futuro(db, elo_ratings, ultima_data, ultima_div, feat_cols, medie_feat, scaler, modelli,
+                               soglia_ev=0.03, flat_stake=10.0, budget_tot=1000.0, solo_top5=True,
+                               modalita_motore="Entrambi (Logit + Poisson)"):
+    url_fix = "https://www." + "football-data.co.uk" + "/fixtures.csv"
     try:
-        df_fix = pd.read_csv(io.StringIO(txt_fix), on_bad_lines='skip', encoding='utf-8-sig', engine='python')
-        df_fix.columns = df_fix.columns.str.replace('ï»¿', '')
-        if 'Div' not in df_fix.columns:
-            raise KeyError("Colonna Div non trovata")
-        df_fix = rinomina_colonne_csv(df_fix)
+        r = requests.get(url_fix, timeout=15)
+        r.raise_for_status()
+        df_fix = pd.read_csv(pd.io.common.StringIO(r.text), on_bad_lines='skip', encoding='utf-8-sig', engine='python')
+        df_fix.columns = df_fix.columns.str.replace('ï»¿', '').str.strip()
     except Exception as e:
-        return pd.DataFrame(), f"Errore lettura palinsesto: {e}"
+        return pd.DataFrame(), f"Impossibile scaricare il palinsesto futuro: {e}"
 
-    df_fix = df_fix[df_fix['Div'].isin(list(CAMPIONATI.keys()))].copy()
-    for c_b, c_avg in [('B365H', 'AvgH'), ('B365D', 'AvgD'), ('B365A', 'AvgA')]:
-        if c_avg in df_fix.columns:
-            df_fix[c_b] = df_fix[c_b].fillna(df_fix[c_avg])
-    df_fix = df_fix.dropna(subset=['Date', 'HomeTeam', 'AwayTeam', 'B365H', 'B365D', 'B365A']).copy()
-    df_fix['Data_DT'] = pd.to_datetime(df_fix['Date'], dayfirst=True, format='mixed', errors='coerce')
+    if df_fix.empty or 'Div' not in df_fix.columns or 'Date' not in df_fix.columns:
+        return pd.DataFrame(), "Palinsesto futuro vuoto su Football-Data."
 
-    if 'Time' in df_fix.columns:
-        dt_uk = pd.to_datetime(df_fix['Date'].astype(str) + ' ' + df_fix['Time'].fillna('15:00').astype(str), dayfirst=True, format='mixed', errors='coerce')
-        df_fix['Kickoff_ITA'] = dt_uk.dt.tz_localize('Europe/London', ambiguous='NaT', nonexistent='NaT').dt.tz_convert('Europe/Rome')
-        df_fix['Ora_ITA'] = df_fix['Kickoff_ITA'].dt.strftime('%H:%M').fillna(df_fix['Time'].fillna('N/D'))
-    else:
-        df_fix['Kickoff_ITA'] = pd.NaT
-        df_fix['Ora_ITA'] = 'N/D'
+    leghe_ok = ['I1', 'E0', 'SP1', 'D1', 'F1'] if solo_top5 else list(CAMPIONATI.keys())
+    df_fix = df_fix[df_fix['Div'].isin(leghe_ok)].copy()
+    if df_fix.empty:
+        return pd.DataFrame(), "Nessuna partita futura in programma per i campionati selezionati."
+
+    df_fix['Data_DT'] = pd.to_datetime(df_fix['Date'].astype(str).str.strip(), dayfirst=True, format='mixed', errors='coerce')
+    ora_str = df_fix['Time'].fillna('15:00').astype(str).str.strip() if 'Time' in df_fix.columns else pd.Series('15:00', index=df_fix.index)
+    ora_str = ora_str.replace({'': '15:00', 'nan': '15:00', 'None': '15:00'})
+    dt_uk_str = df_fix['Data_DT'].dt.strftime('%Y-%m-%d') + ' ' + ora_str
+    dt_uk = pd.to_datetime(dt_uk_str, format='%Y-%m-%d %H:%M', errors='coerce')
+    ko_ita = dt_uk.dt.tz_localize('Europe/London', ambiguous='NaT', nonexistent='NaT').dt.tz_convert('Europe/Rome')
+    df_fix['Kickoff_ITA'] = ko_ita
+    df_fix['Ora_ITA'] = ko_ita.dt.strftime('%H:%M').fillna('15:00')
 
     now_roma = pd.Timestamp.now(tz='Europe/Rome')
     oggi = now_roma.tz_localize(None).normalize()
@@ -484,11 +483,9 @@ def analizza_palinsesto_futuro(db, elo_ratings, ultima_data, ultima_div, feat_co
         (df_fix['Kickoff_ITA'].isna() & (df_fix['Data_DT'] >= oggi))
     ].copy()
 
-
-    if solo_top5:
-        df_fix = df_fix[df_fix['Div'].isin(['I1', 'E0', 'SP1', 'D1', 'F1'])].copy()
     if df_fix.empty:
         return pd.DataFrame(), "Nessuna partita futura in programma per i campionati selezionati."
+
 
     oggi_dt = pd.Timestamp.now()
     anno_corr = oggi_dt.year if oggi_dt.month >= 7 else oggi_dt.year - 1
