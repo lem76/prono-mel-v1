@@ -80,11 +80,11 @@ def esegui_controllo():
     if not df_seg.empty:
         gia_gestite = carica_gia_gestite()
         if gia_gestite:
-    
             df_seg = df_seg[~df_seg.apply(lambda r: (
-                (str(r['Partita']).strip(), str(r['Mercato']).strip(), str(r['Data']).strip()) in gia_gestite or
+                (str(r['Partita']).strip(), str(r['Mercato']).strip(), norm_data(r['Data'])) in gia_gestite or
                 (str(r['Partita']).strip(), str(r['Mercato']).strip(), '') in gia_gestite
             ), axis=1)].reset_index(drop=True)
+
 
 
     if df_seg.empty:
