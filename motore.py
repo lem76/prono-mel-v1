@@ -466,6 +466,15 @@ def analizza_palinsesto_futuro(db, elo_ratings, ultima_data, ultima_div, feat_co
     df_fix = df_fix[df_fix['Div'].isin(leghe_ok)].copy()
     if df_fix.empty:
         return pd.DataFrame(), "Nessuna partita futura in programma per i campionati selezionati."
+    for c_b, c_avg in [('B365H', 'AvgH'), ('B365D', 'AvgD'), ('B365A', 'AvgA')]:
+        if c_b not in df_fix.columns:
+            df_fix[c_b] = np.nan
+        if c_avg in df_fix.columns:
+            df_fix[c_b] = df_fix[c_b].fillna(df_fix[c_avg])
+    df_fix = df_fix.dropna(subset=['Date', 'HomeTeam', 'AwayTeam', 'B365H', 'B365D', 'B365A']).copy()
+    if df_fix.empty:
+        return pd.DataFrame(), "Nessuna partita futura con quote valide trovata."
+
 
     df_fix['Data_DT'] = pd.to_datetime(df_fix['Date'].astype(str).str.strip(), dayfirst=True, format='mixed', errors='coerce')
     ora_str = df_fix['Time'].fillna('15:00').astype(str).str.strip() if 'Time' in df_fix.columns else pd.Series('15:00', index=df_fix.index)
