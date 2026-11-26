@@ -1,8 +1,9 @@
 # BOT ALERT TELEGRAM: Motore condiviso + Esclusione automatica partite già giocate o scartate
 import os
+import io
 import requests
 import pandas as pd
-from motore import costruisci_motore, analizza_palinsesto_futuro
+from motore import costruisci_motore, analizza_palinsesto_futuro, norm_data
 
 TOKEN = os.environ.get("TELEGRAM_TOKEN", "")
 CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "")
@@ -18,7 +19,8 @@ def carica_gia_gestite():
             df_f = pd.read_csv(url_csv)
             if not df_f.empty and 'Partita' in df_f.columns and 'Mercato' in df_f.columns:
                 for _, r_f in df_f.iterrows():
-                    dm_f = str(r_f['Data_Match']).strip() if 'Data_Match' in df_f.columns and pd.notna(r_f.get('Data_Match')) else ''
+                    dm_f = norm_data(r_f['Data_Match']) if 'Data_Match' in df_f.columns and pd.notna(r_f.get('Data_Match')) else ''
+
                     gia_gestite.add((str(r_f['Partita']).strip(), str(r_f['Mercato']).strip(), dm_f))
         except Exception:
             pass
@@ -55,18 +57,18 @@ def esegui_controllo():
             return
         try:
             url_fix = "https://www." + "football-data.co.uk" + "/fixtures.csv"
-            r_fix = requests.get(url_fix, timeout=12)
-            df_chk = pd.read_csv(pd.io.common.StringIO(r_fix.text), on_bad_lines='skip', encoding='utf-8-sig', engine='python')
-            df_chk.columns = df_chk.columns.str.replace('ï»¿', '')
+            r_fix = requests.get(url_fix, headers={"User-Agent": "Mozilla/5.0"}, timeout=12)
+            r_fix.raise_for_status()
+            df_chk = pd.read_csv(io.StringIO(r_fix.text), on_bad_lines='skip', encoding='utf-8-sig', engine='python')
+            df_chk.columns = df_chk.columns.str.replace('ï»¿', '').str.strip()
             df_chk = df_chk[df_chk['Div'].isin(['I1', 'E0', 'SP1', 'D1', 'F1'])].copy()
             dt_uk = pd.to_datetime(df_chk['Date'].astype(str) + ' ' + df_chk['Time'].fillna('15:00').astype(str), dayfirst=True, format='mixed', errors='coerce')
             ko_ita = dt_uk.dt.tz_localize('Europe/London', ambiguous='NaT', nonexistent='NaT').dt.tz_convert('Europe/Rome')
             min_manc = (ko_ita - oggi).dt.total_seconds() / 60.0
             if not ((min_manc >= 20) & (min_manc <= 79)).any():
                 return
-        except Exception:
-            pass
-
+        except Exception as e:
+            print(f"Pre-check fixtures saltato: {e}")
 
     db, elo_ratings, ultima_data, ultima_div, feat_cols, medie_feat, scaler, modelli = costruisci_motore(usa_cache=False)
     df_seg, msg = analizza_palinsesto_futuro(
