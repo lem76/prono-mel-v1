@@ -454,19 +454,15 @@ def valuta_match_poisson(row, db, stagione_corr, mappa_quote):
 def analizza_palinsesto_futuro(db, elo_ratings, ultima_data, ultima_div, feat_cols, medie_feat, scaler, modelli,
                                soglia_ev=0.03, flat_stake=10.0, budget_tot=1000.0, solo_top5=True,
                                modalita_motore="Entrambi (Logit + Poisson)"):
+   
+
     url_fix = "https://www." + "football-data.co.uk" + "/fixtures.csv"
-    try:
-        r = requests.get(url_fix, timeout=15)
-        r.raise_for_status()
-        df_fix = pd.read_csv(pd.io.common.StringIO(r.text), on_bad_lines='skip', encoding='utf-8-sig', engine='python')
-        df_fix.columns = df_fix.columns.str.replace('ï»¿', '').str.strip()
-        df_fix = rinomina_colonne_csv(df_fix)
+    df_fix = scarica_csv_veloce(url_fix)
+    if df_fix is None or df_fix.empty or 'Div' not in df_fix.columns or 'Date' not in df_fix.columns:
+        return pd.DataFrame(), "Impossibile scaricare il palinsesto futuro o file vuoto su Football-Data."
+    df_fix.columns = df_fix.columns.str.replace('ï»¿', '').str.strip()
+    df_fix = rinomina_colonne_csv(df_fix)
 
-    except Exception as e:
-        return pd.DataFrame(), f"Impossibile scaricare il palinsesto futuro: {e}"
-
-    if df_fix.empty or 'Div' not in df_fix.columns or 'Date' not in df_fix.columns:
-        return pd.DataFrame(), "Palinsesto futuro vuoto su Football-Data."
 
     leghe_ok = ['I1', 'E0', 'SP1', 'D1', 'F1'] if solo_top5 else list(CAMPIONATI.keys())
     df_fix = df_fix[df_fix['Div'].isin(leghe_ok)].copy()
