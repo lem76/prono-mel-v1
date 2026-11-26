@@ -337,7 +337,15 @@ with st.sidebar:
         st.cache_resource.clear()
         st.rerun()
 
-db, elo_ratings, ultima_data, ultima_div, feat_cols, medie_feat, scaler, modelli = prepara_motore_predittivo()
+try:
+    db, elo_ratings, ultima_data, ultima_div, feat_cols, medie_feat, scaler, modelli = prepara_motore_predittivo()
+except Exception as e:
+    st.error(f"⚠️ Impossibile caricare i dati storici da Football-Data: {e}")
+    if st.button("🔄 Riprova"):
+        st.cache_resource.clear()
+        st.rerun()
+    st.stop()
+
 st.sidebar.success(f"Database attivo: {len(db)} partite analizzate")
 
 tab_prono, tab_tracker, tab_guida = st.tabs([
