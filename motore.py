@@ -41,6 +41,13 @@ CAMPIONATI = {
 
 LEGHE_POISSON = ['I1', 'E0', 'SP1', 'D1']
 
+def norm_data(x):
+    s = str(x).strip()
+    d = pd.to_datetime(s, format='ISO8601', errors='coerce')
+    if pd.isna(d):
+        d = pd.to_datetime(s, dayfirst=True, format='mixed', errors='coerce')
+    return d.strftime('%Y-%m-%d') if pd.notna(d) else s
+
 def devig_power_singolo(quote):
     q = np.asarray(quote, dtype=float)
     if np.any(np.isnan(q)) or np.any(q <= 1.0):
