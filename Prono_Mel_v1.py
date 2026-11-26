@@ -251,12 +251,14 @@ def invia_alert_telegram(df_seg):
     testo = "\n".join(righe)
     url_tg = "https://api." + "telegram.org" + f"/bot{token}/sendMessage"
     try:
-        resp = requests.post(url_tg, json={"chat_id": chat_id, "text": testo}, timeout=10)
-        if resp.status_code == 200:
-            return True, "Alert inviato con successo su Telegram!"
-        return False, f"Errore Telegram ({resp.status_code}): avvia prima la chat con il tuo bot."
+        for i in range(0, len(testo), 3800):
+            resp = requests.post(url_tg, json={"chat_id": chat_id, "text": testo[i:i+3800]}, timeout=10)
+            if resp.status_code != 200:
+                return False, f"Errore Telegram ({resp.status_code}): {resp.text}"
+        return True, "Alert inviato con successo su Telegram!"
     except Exception as e:
-        return False, f"Errore invio Telegram: {e}"
+        return False, f"Errore connessione Telegram: {e}"
+
 
 def chiudi_partite_automatico(df_tr, db_storico):
     in_corso = df_tr[df_tr['Esito'] == 'In Corso']
