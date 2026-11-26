@@ -11,7 +11,7 @@ from scipy.special import logit, expit
 from motore import (
     QUOTA_MIN, QUOTA_MAX, MAX_ESPOSIZIONE_GIORNO_PCT,
     CAMPIONATI, devig_power_singolo, costruisci_motore,
-    analizza_palinsesto_futuro, p_close_pulita
+    analizza_palinsesto_futuro, p_close_pulita, norm_data
 )
 
 st.set_page_config(page_title="Prono Mel v1 - Calcio AI & Tracker", page_icon="⚽", layout="wide")
