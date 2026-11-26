@@ -169,12 +169,18 @@ def costruisci_motore(forza_aggiornamento=False, usa_cache=True):
         if 'Stagione' not in df_pass.columns:
             df_pass['Stagione'] = 'pass'
     else:
-        df_pass, falliti = scarica_stagioni(stagioni_pass)
-        if usa_cache and not falliti and not df_pass.empty:
+        df_pass, falliti_pass = scarica_stagioni(stagioni_pass)
+        critici_pass = [f for f in falliti_pass if f.split('_')[0] in ('I1', 'E0', 'SP1', 'D1', 'F1')]
+        if critici_pass:
+            raise RuntimeError(f"Download storico fallito per leghe principali: {critici_pass}")
+        if usa_cache and not falliti_pass and not df_pass.empty:
             df_pass.to_csv(file_cache_dinamico, index=False)
 
+    df_curr, falliti_curr = scarica_stagioni([stagione_corr])
+    critici_curr = [f for f in falliti_curr if f.split('_')[0] in ('I1', 'E0', 'SP1', 'D1', 'F1')]
+    if critici_curr or df_curr.empty:
+        raise RuntimeError(f"Download stagione corrente fallito per leghe principali: {critici_curr}")
 
-    df_curr, _ = scarica_stagioni([stagione_corr])
     db = pd.concat([df_pass, df_curr], ignore_index=True)
     db = db.dropna(subset=['Date', 'HomeTeam', 'AwayTeam', 'FTHG', 'FTAG', 'B365H', 'B365D', 'B365A'])
     db['Data_DT'] = pd.to_datetime(db['Date'], dayfirst=True, format='mixed', errors='coerce')
