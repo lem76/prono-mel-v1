@@ -388,6 +388,8 @@ def valuta_match_logit(row, db, elo_ratings, ultima_data, ultima_div, medie_feat
                     'Partita': f"{casa} - {trasf}", 'Mercato': m_nome,
                     'Quota_B365': qb, 'Quota_Media': round(qavg, 2), 'Quota_MAX': qmax,
                     'Prob_AI_Pct': round(p_ai * 100.0, 2), 'EV_Pct': round(ev * 100.0, 2),
+                    'EV_su_Media_Pct': round(((p_ai * qavg) - 1.0) * 100.0, 2) if pd.notna(qavg) else np.nan,
+
                     'Puntata_Consigliata': flat_stake,
                     'Adj_1': adj_logit.get('1', 0.0), 'Adj_X': adj_logit.get('X', 0.0), 'Adj_2': adj_logit.get('2', 0.0),
                     'Adj_O25': adj_logit.get('OVER 2.5', 0.0), 'Adj_U25': adj_logit.get('UNDER 2.5', 0.0)
@@ -439,6 +441,8 @@ def valuta_match_poisson(row, db, stagione_corr, mappa_quote):
                     'Partita': f"{casa} - {trasf}", 'Mercato': m_nome,
                     'Quota_B365': qb, 'Quota_Media': round(qavg, 2), 'Quota_MAX': qmax,
                     'Prob_AI_Pct': round(p_ai * 100.0, 2), 'EV_Pct': round(ev * 100.0, 2),
+                    'EV_su_Media_Pct': round(((p_ai * qavg) - 1.0) * 100.0, 2) if pd.notna(qavg) else np.nan,
+
                     'Puntata_Consigliata': 5.0,
                     'Adj_1': 0.0, 'Adj_X': 0.0, 'Adj_2': 0.0,
                     'Adj_O25': 0.0, 'Adj_U25': 0.0
