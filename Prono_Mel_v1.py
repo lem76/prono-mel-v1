@@ -434,13 +434,13 @@ with tab_prono:
 
                         if p_live_saved is not None:
                             delta_p = p_live_saved - float(riga['Prob_AI_Pct'])
-                            st.info(f"📡 **Consenso Live (effetto grafico quote):** Probabilità AI attuale = **{p_live_saved:.2f}%** ({delta_p:+.2f}% rispetto all'apertura {riga['Prob_AI_Pct']:.2f}%)")
+                            st.info(f"📊 **Consenso Live (effetto grafico quote):** Probabilità AI attuale = **{p_live_saved:.2f}%** ({delta_p:+.2f}% rispetto all'apertura {riga['Prob_AI_Pct']:.2f}%)")
                             if delta_p < -1.0:
-                                 st.error(f"🔴 Consenso Live in forte calo ({delta_p:+.2f}% rispetto all'apertura): SCARTA")
-                             elif delta_p < -0.5:
-                                 st.warning(f"🟡 Consenso Live in leggero calo ({delta_p:+.2f}% rispetto all'apertura): segui EV Reale")
-                             else:
-                                 st.success(f"🟢 Consenso Live stabile/in aumento ({delta_p:+.2f}% rispetto all'apertura): VIA LIBERA")
+                                st.error(f"🔴 Consenso Live in forte calo ({delta_p:+.2f}% rispetto all'apertura): SCARTA")
+                            elif delta_p < -0.5:
+                                st.warning(f"🟡 Consenso Live in leggero calo ({delta_p:+.2f}% rispetto all'apertura): segui EV Reale")
+                            else:
+                                st.success(f"🟢 Consenso Live stabile/in aumento ({delta_p:+.2f}% rispetto all'apertura): VIA LIBERA")
 
                             usa_consenso_live = st.checkbox("Usa Prior Consenso Live (consigliato se le quote si sono mosse)", value=True)
                             if usa_consenso_live:
