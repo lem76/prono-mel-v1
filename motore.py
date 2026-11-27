@@ -457,11 +457,18 @@ def analizza_palinsesto_futuro(db, elo_ratings, ultima_data, ultima_div, feat_co
    
 
     url_fix = "https://www." + "football-data.co.uk" + "/fixtures.csv"
-    df_fix = scarica_csv_veloce(url_fix)
-    if df_fix is None or df_fix.empty or 'Div' not in df_fix.columns or 'Date' not in df_fix.columns:
-        return pd.DataFrame(), "Impossibile scaricare il palinsesto futuro o file vuoto su Football-Data."
+    txt_fix = scarica_csv_veloce(url_fix)
+    if txt_fix is None:
+        return pd.DataFrame(), "Impossibile scaricare il palinsesto futuro da Football-Data."
+    try:
+        df_fix = pd.read_csv(io.StringIO(txt_fix), on_bad_lines='skip', encoding='utf-8-sig', engine='python')
+    except Exception as e:
+        return pd.DataFrame(), f"Errore lettura palinsesto: {e}"
     df_fix.columns = df_fix.columns.str.replace('ï»¿', '').str.strip()
+    if df_fix.empty or 'Div' not in df_fix.columns or 'Date' not in df_fix.columns:
+        return pd.DataFrame(), "Palinsesto futuro vuoto su Football-Data."
     df_fix = rinomina_colonne_csv(df_fix)
+
 
 
     leghe_ok = ['I1', 'E0', 'SP1', 'D1', 'F1'] if solo_top5 else list(CAMPIONATI.keys())
