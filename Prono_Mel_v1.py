@@ -648,4 +648,6 @@ with tab_guida:
     * **Pulizia automatica tabella:** Ogni partita registrata o scartata sparisce subito dall'elenco delle partite da valutare.
     * **Chiusura Automatica (Lunedì alle 10:45):** Premi **🔄 Chiudi Partite Concluse in Automatico** nella Scheda 2. Il software calcola il **CLV Netto tramite Power Devig reale** sulle quote di chiusura ufficiali e aggiorna automaticamente su Google Sheets sia **`Confronto_Strategie`** sia **`Curva_Equity`**.
     * **Semaforo Validazione:** 🟡 Giallo fino a **300 giocate con CLV valido** -> selezionando una singola strategia nel filtro (`Motore A` o `Motore B`), diventa 🟢 Verde se `CLV Netto Medio - 2·SE > 0%` (significatività al 95%) e `Max Drawdown < 15%`.
+    """)
+
 
