@@ -425,21 +425,30 @@ with tab_prono:
                 if st.button("🔎 Cerca Quota Migliore & Consenso Live"):
                     df_live, p_live_ai, esito_api = cerca_migliore_quota_live(odds_api_key, riga['Sport_Key'], riga['Casa'], riga['Trasferta'], riga)
                     st.session_state["cache_odds_live"][chiave_match] = (df_live, p_live_ai, esito_api)
-                    
-
-                    
+                                        
                 if chiave_match in st.session_state["cache_odds_live"]:
                     df_live_saved, p_live_saved, esito_saved = st.session_state["cache_odds_live"][chiave_match]
                     if df_live_saved is not None:
                         st.dataframe(df_live_saved, use_container_width=True)
+                        
+
                         if p_live_saved is not None:
                             delta_p = p_live_saved - float(riga['Prob_AI_Pct'])
                             st.info(f"📡 **Consenso Live (effetto grafico quote):** Probabilità AI attuale = **{p_live_saved:.2f}%** ({delta_p:+.2f}% rispetto all'apertura {riga['Prob_AI_Pct']:.2f}%)")
+                            if delta_p < -1.0:
+                                 st.error(f"🔴 Consenso Live in forte calo ({delta_p:+.2f}% rispetto all'apertura): SCARTA")
+                             elif delta_p < -0.5:
+                                 st.warning(f"🟡 Consenso Live in leggero calo ({delta_p:+.2f}% rispetto all'apertura): segui EV Reale")
+                             else:
+                                 st.success(f"🟢 Consenso Live stabile/in aumento ({delta_p:+.2f}% rispetto all'apertura): VIA LIBERA")
+
                             usa_consenso_live = st.checkbox("Usa Prior Consenso Live (consigliato se le quote si sono mosse)", value=True)
                             if usa_consenso_live:
                                 prob_base_usata = float(p_live_saved)
                     else:
                         st.info(esito_saved)
+
+
 
             with col_b:
                 st.markdown("**B. Check Assenze, Kelly 1/4 & Calcolo EV Finale**")
