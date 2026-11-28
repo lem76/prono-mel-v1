@@ -395,9 +395,15 @@ with tab_prono:
             st.warning(st.session_state.get('msg_segnali', 'Nessun segnale trovato o tutte le partite sono già state gestite.'))
         else:
             cols_mostra = [c for c in ['Motore', 'Data', 'Ora_ITA', 'Campionato', 'Partita', 'Mercato', 'Quota_B365', 'Quota_Media', 'Quota_MAX', 'Prob_AI_Pct', 'EV_Pct', 'EV_su_Media_Pct', 'Puntata_Consigliata'] if c in df_seg.columns]
-            st.dataframe(df_seg[cols_mostra], use_container_width=True)
-            
+           
+            rimandate = st.session_state.get("rimandate_t45", set())
+            df_vis = df_seg[cols_mostra].copy()
+            def _evidenzia_t45(row):
+                k = f"{row['Partita']}_{row['Mercato']}"
+                return ['background-color: #d4edda; color: #155724' if k in rimandate else '' for _ in row]
+            st.dataframe(df_vis.style.apply(_evidenzia_t45, axis=1), use_container_width=True)
 
+            
 
             if st.button("📲 Invia Pronostici su Telegram"):
                 ok_tg, msg_tg = invia_alert_telegram(df_seg)
@@ -509,6 +515,8 @@ with tab_prono:
                 with c_btn2:
                     motivo_scarto = st.text_input("Motivo eventuale scarto", value="Quota scesa / Assenze chiave")
                     if st.button("🗑️ Scarta e Archivia Decisione"):
+
+
                         registra_scarto({
                             'Data_Log': pd.Timestamp.now(tz="Europe/Rome").strftime("%Y-%m-%d %H:%M"),
                             'Data_Match': riga['Data'], 'Motore': riga['Motore'],
@@ -517,6 +525,9 @@ with tab_prono:
                             'Motivo': motivo_scarto
                         })
                         st.session_state['segnali_correnti'] = df_seg.drop(df_seg.index[scelta_idx]).reset_index(drop=True)
+                        st.rerun()
+                    if st.button("⏳ Rimanda a T-45"):
+                        st.session_state.setdefault("rimandate_t45", set()).add(f"{riga['Partita']}_{riga['Mercato']}")
                         st.rerun()
 
 
@@ -658,6 +669,13 @@ with tab_guida:
     * **Pulizia automatica tabella:** Ogni partita registrata o scartata sparisce subito dall'elenco delle partite da valutare.
     * **Chiusura Automatica (Lunedì alle 10:45):** Premi **🔄 Chiudi Partite Concluse in Automatico** nella Scheda 2. Il software calcola il **CLV Netto tramite Power Devig reale** sulle quote di chiusura ufficiali e aggiorna automaticamente su Google Sheets sia **`Confronto_Strategie`** sia **`Curva_Equity`**.
     * **Semaforo Validazione:** 🟡 Giallo fino a **300 giocate con CLV valido** -> selezionando una singola strategia nel filtro (`Motore A` o `Motore B`), diventa 🟢 Verde se `CLV Netto Medio - 2·SE > 0%` (significatività al 95%) e `Max Drawdown < 15%`.
+        ### 📊 Tabella Rapida Confronto Quote Live (quando il semaforo automatico è Giallo)
+    * **Se la quota SCENDE (il mercato punta con te):** Sempre **valida** purché la tua quota ADM/Exchange dia **`EV Reale >= +3.0%`**.
+    * **Se la quota SALE (il mercato va contro di te) — soglia massima rispetto a `Quota MAX`:**
+    * **Quote basse (`1.50 – 1.85`):** Valida fino a **`+0.08`** (es. `1.80 -> 1.86`) | **Oltre `+0.08` -> SCARTA**
+    * **Quote medie (`1.86 – 2.50`):** Valida fino a **`+0.12`** (es. `2.10 -> 2.20`) | **Oltre `+0.12` -> SCARTA**
+    * **Quote alte (`2.51 – 4.00`):** Valida fino a **`+0.25`** (es. `3.00 -> 3.20`) | **Oltre `+0.25` -> SCARTA**
+
     """)
 
 
