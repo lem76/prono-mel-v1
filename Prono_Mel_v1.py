@@ -446,7 +446,7 @@ with tab_prono:
                             if usa_consenso_live:
                                 prob_base_usata = float(p_live_saved)
                         else:
-                            st.warning(f"🟡 Consenso Live automatico non calcolabile ({esito_saved}): confronta manualmente Pinnacle/Exchange nella tabella sopra con Quota MAX ({riga['Quota_MAX']}).")
+                            st.warning(f"🟡 Consenso Live automatico non disponibile per questo mercato: confronta manualmente Pinnacle/Exchange nella tabella sopra con Quota MAX ({riga['Quota_MAX']}).")
 
 
 
